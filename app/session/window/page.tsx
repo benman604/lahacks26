@@ -42,14 +42,7 @@ export default function SessionWindow() {
 
   }
 
-  function toggleTimer() {
-    if (running) stopTimer();
-    else startTimer();
-  }
   const [image, setImage] = useState<{ base64: string; mimeType: string } | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [geminiResult, setGeminiResult] = useState<{ value: string; text: string } | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     const unlistenTrigger = listen("trigger-blockers", async () => {
@@ -185,40 +178,6 @@ export default function SessionWindow() {
       timerRef.current = null;
     }
     setRunning(false);
-  }
-
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const base64 = dataUrl.split(",")[1];
-      setImage({ base64, mimeType: file.type });
-      setPreview(dataUrl);
-      setGeminiResult(null);
-    };
-    reader.readAsDataURL(file);
-  }
-
-  async function analyzeImage() {
-    if (!image) return;
-    setAnalyzing(true);
-    setGeminiResult(null);
-    try {
-      const res = await fetch("/api/gemini", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: image.base64, mimeType: image.mimeType }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setGeminiResult(data);
-    } catch (err) {
-      setGeminiResult({ value: "–", text: String(err) });
-    } finally {
-      setAnalyzing(false);
-    }
   }
 
   function toggleTimer() {
