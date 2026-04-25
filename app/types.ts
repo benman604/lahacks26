@@ -1,3 +1,9 @@
+// Flow:
+// 1. User starts a session and provides a title and ideal break time
+// 2. During the session, every N seconds, a screenshot is taken and the following data is recorded: timestamp, focus type (focused, distracted, or break), website or app name, and whether the user is idle. A user is focused if on a focused website or app, distracted if not, and on a break if they intentionally started a break. isIdle is true if the screenshot looks basically the same as the previous one (indicating no activity, need to figure out prompt for this). websiteOrApp is the name of the website or app that the user is on, or "unknown" if it can't be determined.
+// 3. When the session ends the raw RawSessionData is processed to create a SessionData object. The main difference is that instead of having raw screenshot data, we have focusElements and appElements. focusElements are contiguous periods of time where the user is in the same focus type. For appElements, the AI is first asked to come up with categories of apps that are roughly the same activity and then making contiguous periods of time where the user is in the same category of app/website. idleTimeSeconds is the total time during the session where the user is idle. The start and end timestamps of the session are also included in SessionData for easy access.
+// 4. When the user is viewing their session summary card, the SessionData is processed to create a SessionSummary.
+
 type FocusElement = {
 	startTimestamp: Date;
 	endTimestamp: Date;
