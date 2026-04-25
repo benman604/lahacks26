@@ -1,3 +1,28 @@
+import { createAgent } from "langchain";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { HumanMessage } from "@langchain/core/messages";
+import * as z from "zod";
+import { ScreeshotData } from "../../types";
+
+const model = new ChatGoogleGenerativeAI({
+  model: "gemini-pro",
+  maxOutputTokens: 2048,
+});
+
+const ScreenshotDataSchema = z.object({
+  timestamp: z.date(),
+  focusType: z.enum(["focus", "distracted", "break"]),
+  websiteOrApp: z.string(),
+  isIdle: z.boolean(),
+});
+
+const agent = createAgent({
+  model: "openai:gpt-5.4",
+  tools: [],
+  responseFormat: ScreenshotDataSchema
+});
+
+
 const PROMPT =
   "Look at this image. Return a score from 1–10 and one sentence of feedback.";
 
