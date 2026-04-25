@@ -8,6 +8,9 @@ import {
   LogicalSize,
 } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
+import LeftSidebar from "./components/LeftSidebar";
+import FeedSection from "./components/FeedSection";
+import RightSidebar from "./components/RightSidebar";
 
 const blockerLabels: string[] = [];
 
@@ -88,13 +91,10 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen">
-      <button
-        onClick={openBlockers}
-        className="px-6 py-3 rounded-full bg-black text-white"
-      >
-        Start Session
-      </button>
+    <div className="flex gap-8 max-w-7xl mx-auto w-full px-6 py-8">
+      <LeftSidebar />
+      <FeedSection openBlockers={openBlockers} />
+      <RightSidebar />
     </div>
   );
 }
