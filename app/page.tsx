@@ -1,6 +1,38 @@
+"use client";
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { currentMonitor, LogicalPosition, LogicalSize } from '@tauri-apps/api/window';
 import Image from "next/image";
 
 export default function Home() {
+  async function openTimer() {
+    const timer = new WebviewWindow('timer', {
+      url: '/session/gbtw',
+      decorations: false,
+      alwaysOnTop: true,
+      resizable: false,
+      transparent: true,
+    });
+
+    timer.once('tauri://created', async () => {
+      const monitor = await currentMonitor();
+
+      if (!monitor) return;
+
+      const { width, height } = monitor.size;
+      const scale = monitor.scaleFactor;
+
+      await timer.setPosition(new LogicalPosition(0, 0));
+
+      await timer.setSize(
+        new LogicalSize(width / scale, height / scale)
+      );
+    });
+
+    timer.once('tauri://error', (e) => {
+      console.error('failed to create window', e);
+    });
+  }
+  
   return (
     <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
       <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
@@ -37,9 +69,7 @@ export default function Home() {
         <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
           <a
             className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            onClick={openTimer}
           >
             <Image
               className="dark:invert"
@@ -48,7 +78,7 @@ export default function Home() {
               width={16}
               height={16}
             />
-            Deploy Now
+            Start Session
           </a>
           <a
             className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
