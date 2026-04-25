@@ -1,100 +1,67 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import {
-  availableMonitors,
-  LogicalPosition,
-  LogicalSize,
-} from "@tauri-apps/api/window";
-import { listen } from "@tauri-apps/api/event";
+import { currentMonitor, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
+import { emit } from "@tauri-apps/api/event";
 import LeftSidebar from "./components/LeftSidebar";
 import FeedSection from "./components/FeedSection";
 import RightSidebar from "./components/RightSidebar";
 
-const blockerLabels: string[] = [];
-
 export default function Home() {
-  useEffect(() => {
-    let mounted = true;
+  async function openSession() {
+    const label = "session-window";
+    const existing = await WebviewWindow.getByLabel(label);
+    if (existing) {
+      await existing.setFocus();
+      return;
+    }
 
-    const unlistenPromise = listen("close-blockers", async () => {
-      if (!mounted) return;
-
-      for (const label of blockerLabels.splice(0)) {
-        const w = await WebviewWindow.getByLabel(label);
-
-        if (w) {
-          try {
-            await w.close();
-          } catch (e) {
-            console.error("failed to close blocker", label, e);
-          }
-        }
-      }
+    const win = new WebviewWindow(label, {
+      url: "/session/window",
+      decorations: true,
+      alwaysOnTop: true,
+      resizable: true,
+      transparent: false,
+      // other platform-specific options are supported by Tauri window builder
     });
 
-    return () => {
-      mounted = false;
-      unlistenPromise.then((un) => un()).catch(() => {});
-    };
-  }, []);
-
-  async function openBlockers() {
-    const monitors = await availableMonitors();
-
-    for (let i = 0; i < monitors.length; i++) {
-      const m = monitors[i];
-      const label = `blocker-${i}`;
-
-      // prevent duplicates
-      const existing = await WebviewWindow.getByLabel(label);
-      if (existing) {
-        await existing.setFocus();
-        continue;
+    win.once("tauri://created", async () => {
+      try {
+        const monitor = await currentMonitor();
+        if (!monitor) return;
+        const { width, height } = monitor.size;
+        const w = 420;
+        const h = 220;
+        const x = Math.floor((width - w) / 2);
+        const y = Math.floor((height - h) / 2);
+        await win.setPosition(new LogicalPosition(x, y));
+        await win.setSize(new LogicalSize(w, h));
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("failed to position session window", e);
       }
+    });
+  }
 
-      const blocker = new WebviewWindow(label, {
-        url: "/session/gbtw",
-        decorations: false,
-        alwaysOnTop: true,
-        resizable: false,
-        transparent: true,
-      });
-
-      blocker.once("tauri://created", async () => {
-        try {
-          const scale = m.scaleFactor;
-
-          // IMPORTANT: use monitor position + size (physical → convert)
-          await blocker.setPosition(
-            new LogicalPosition(m.position.x / scale, m.position.y / scale)
-          );
-
-          await blocker.setSize(
-            new LogicalSize(
-              m.size.width / scale,
-              m.size.height / scale
-            )
-          );
-        } catch (e) {
-          console.error("failed to size blocker", e);
-        }
-      });
-
-      blocker.once("tauri://error", (e) => {
-        console.error("failed to create blocker", e);
-      });
-
-      blockerLabels.push(label);
+  async function testBlocking() {
+    try {
+      await emit("trigger-blockers");
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("failed to emit trigger-blockers", e);
     }
   }
 
   return (
     <div className="flex gap-8 max-w-7xl mx-auto w-full px-6 py-8">
       <LeftSidebar />
-      <FeedSection openBlockers={openBlockers} />
+      <FeedSection openBlockers={openSession} />
       <RightSidebar />
+
+      <button onClick={testBlocking} className="px-6 py-3 rounded-full bg-white text-black hover:bg-gray-200 transition">
+        Test Blocking
+      </button>
     </div>
   );
 }
