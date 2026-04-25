@@ -11,19 +11,60 @@ export default function SessionWindow() {
   const [secondsLeft, setSecondsLeft] = useState<number>(0);
   const [running, setRunning] = useState(false);
   const timerRef = useRef<number | null>(null);
+  const [recordingEnabled, setRecordingEnabled] = useState(false);
 
+  // screenshot helpers
+  const streamRef = useRef<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  async function enableRecording() {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const s = await (navigator.mediaDevices as any).getDisplayMedia({ video: { cursor: "always" } });
+      streamRef.current = s as MediaStream;
+      const v = document.createElement("video");
+      v.style.display = "none";
+      v.srcObject = streamRef.current;
+      v.playsInline = true;
+      document.body.appendChild(v);
+      videoRef.current = v;
+      await new Promise<void>((resolve) => {
+        const onLoaded = () => resolve();
+        v.addEventListener("loadedmetadata", onLoaded, { once: true });
+      });
+      await v.play();
+      setRecordingEnabled(true);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("failed to enable recording", e);
+    }
+
+  }
+
+  function toggleTimer() {
+    if (running) stopTimer();
+    else startTimer();
+  }
   const [image, setImage] = useState<{ base64: string; mimeType: string } | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [geminiResult, setGeminiResult] = useState<{ value: string; text: string } | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
-    const unlistenPromise = listen("trigger-blockers", async () => {
+    const unlistenTrigger = listen("trigger-blockers", async () => {
       await openBlockers();
     });
 
+    const unlistenClose = listen("close-blockers", async () => {
+      await closeBlockers();
+    });
+
+    startTimer();
+
     return () => {
-      unlistenPromise.then((un) => un()).catch(() => {});
+      unlistenTrigger.then((un) => un()).catch(() => {});
+      unlistenClose.then((un) => un()).catch(() => {});
       stopTimer();
       closeBlockers();
     };
@@ -91,20 +132,50 @@ export default function SessionWindow() {
     }
   }
 
-  function startTimer(seconds: number) {
+  async function takeScreenshotAndSend() {
+    try {
+      // recording must be enabled first
+      if (!streamRef.current) {
+        throw new Error("Recording not enabled. Click 'Enable Recording' first.");
+      }
+
+      const v = videoRef.current!;
+      if (!canvasRef.current) canvasRef.current = document.createElement("canvas");
+      const c = canvasRef.current!;
+      c.width = v.videoWidth || window.innerWidth;
+      c.height = v.videoHeight || window.innerHeight;
+      const ctx = c.getContext("2d");
+      if (!ctx) throw new Error("no canvas context");
+      ctx.drawImage(v, 0, 0, c.width, c.height);
+      const dataUrl = c.toDataURL("image/png");
+
+      // send to server
+      const res = await fetch("/api/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataUrl }),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        // eslint-disable-next-line no-console
+        console.error("screenshot upload failed", res.status, txt);
+      } else {
+        // eslint-disable-next-line no-console
+        console.log("screenshot uploaded");
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("takeScreenshotAndSend failed", e);
+    }
+  }
+
+  // count-up timer
+  function startTimer() {
     if (timerRef.current) return;
-    setSecondsLeft(seconds);
     setRunning(true);
     timerRef.current = window.setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) {
-          stopTimer();
-          // when timer ends, trigger blockers
-          openBlockers().catch((e) => console.error(e));
-          return 0;
-        }
-        return s - 1;
-      });
+      setSecondsLeft((s) => s + 1);
     }, 1000);
   }
 
@@ -150,6 +221,11 @@ export default function SessionWindow() {
     }
   }
 
+  function toggleTimer() {
+    if (running) stopTimer();
+    else startTimer();
+  }
+
   function formatTime(sec: number) {
     const m = Math.floor(sec / 60)
       .toString()
@@ -162,81 +238,64 @@ export default function SessionWindow() {
 
   return (
     <div className="p-4 w-full h-full flex flex-col gap-4 items-center justify-center">
-      <div className="flex flex-col items-center">
-        <h2 className="text-lg font-semibold">Session Controller</h2>
-        <div className="mt-2 text-2xl">{formatTime(secondsLeft)}</div>
-        <div className="mt-2 flex gap-2">
-          <button
-            onClick={() => startTimer(25 * 60)}
-            className="px-3 py-1 rounded bg-blue-600 text-white"
-          >
-            Start 25m
-          </button>
-          <button onClick={() => startTimer(5 * 60)} className="px-3 py-1 rounded bg-green-600 text-white">
-            Start 5m
-          </button>
-          <button onClick={stopTimer} className="px-3 py-1 rounded bg-yellow-500">
-            Pause
-          </button>
-        </div>
-      </div>
+      
+			{(!recordingEnabled || !streamRef.current) && (
+				<div>
+					<h2>Please enable screen recording on all screens to start your session</h2>
+					<button
+						onClick={enableRecording}
+						className="px-3 py-1 rounded bg-purple-600 text-white hover:bg-purple-700"
+					>
+						Enable Recording
+					</button>
+				</div>
+			)}
 
-      <div className="flex gap-2">
-        <button
-          onClick={() => openBlockers()}
-          className="px-3 py-1 rounded bg-red-600 text-white"
-        >
-          Test Blocking
-        </button>
+			{(recordingEnabled || streamRef.current) && (
+				<div>
+					<div className="flex flex-col items-center">
+						<h2 className="text-lg font-semibold">Session Controller</h2>
+						<div className="mt-2 text-2xl">{formatTime(secondsLeft)}</div>
+						<div className="mt-2 flex gap-2 items-center">
+							<button onClick={toggleTimer} className="px-3 py-1 rounded bg-blue-600 text-white">
+								{running ? "Pause" : "Play"}
+							</button>
+							<button
+								onClick={enableRecording}
+								disabled={recordingEnabled}
+								className={`px-3 py-1 rounded ${
+									recordingEnabled
+										? "bg-green-600 text-white cursor-default"
+										: "bg-purple-600 text-white hover:bg-purple-700"
+								}`}
+							>
+								{recordingEnabled ? "✓ Recording" : "Enable Recording"}
+							</button>
+						</div>
+					</div>
+					<div className="flex gap-2">
+						<button
+							onClick={() => openBlockers()}
+							className="px-3 py-1 rounded bg-red-600 text-white"
+						>
+							Test Blocking
+						</button>
+						<button onClick={takeScreenshotAndSend} className="px-3 py-1 rounded bg-blue-700 text-white">
+							Test Screenshot
+						</button>
+						<button
+							onClick={() => {
+								stopTimer();
+								closeBlockers();
+							}}
+							className="px-3 py-1 rounded bg-gray-700 text-white"
+						>
+							Stop Session
+						</button>
+					</div>
+				</div>
+			)}
 
-        <button
-          onClick={() => {
-            stopTimer();
-            closeBlockers();
-          }}
-          className="px-3 py-1 rounded bg-gray-700 text-white"
-        >
-          Stop Session
-        </button>
-      </div>
-
-      {/* Gemini image analysis */}
-      <div className="w-full max-w-sm flex flex-col gap-3 border-t border-gray-200 pt-4">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">
-            Analyze screenshot
-          </span>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageChange}
-            className="text-sm text-gray-600 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
-          />
-        </label>
-
-        {preview && (
-          <img
-            src={preview}
-            alt="preview"
-            className="w-full max-h-32 object-contain rounded border border-gray-200"
-          />
-        )}
-
-        <button
-          onClick={analyzeImage}
-          disabled={!image || analyzing}
-          className="px-4 py-1.5 rounded bg-blue-600 text-white text-sm font-medium disabled:opacity-40 hover:bg-blue-700 transition-colors"
-        >
-          {analyzing ? "Analyzing…" : "Analyze ▶"}
-        </button>
-
-        {geminiResult && (
-          <div className="flex flex-col items-center gap-1 py-3 bg-gray-50 rounded-lg border border-gray-200">
-            <span className="text-3xl font-bold">{geminiResult.value}</span>
-            <p className="text-sm text-gray-600 text-center px-3">{geminiResult.text}</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+		</div>
+	);
 }

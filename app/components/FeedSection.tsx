@@ -41,9 +41,9 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
 }
 
 export default function FeedSection({
-  openBlockers,
+  openSession,
 }: {
-  openBlockers: () => void;
+  openSession: () => void;
 }) {
   const [subject, setSubject] = useState("Organic Chem");
   const [duration, setDuration] = useState("50 min");
@@ -83,7 +83,7 @@ export default function FeedSection({
         </div>
 
         <button
-          onClick={openBlockers}
+          onClick={openSession}
           className="col-span-2 py-2 rounded-lg text-white text-sm font-semibold hover:opacity-90 transition-opacity"
           style={{ backgroundColor: "var(--p2p-accent)" }}
         >
