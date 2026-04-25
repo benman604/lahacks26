@@ -12,6 +12,11 @@ export default function SessionWindow() {
   const [running, setRunning] = useState(false);
   const timerRef = useRef<number | null>(null);
 
+  const [image, setImage] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [geminiResult, setGeminiResult] = useState<{ value: string; text: string } | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+
   useEffect(() => {
     const unlistenPromise = listen("trigger-blockers", async () => {
       await openBlockers();
@@ -111,6 +116,40 @@ export default function SessionWindow() {
     setRunning(false);
   }
 
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.split(",")[1];
+      setImage({ base64, mimeType: file.type });
+      setPreview(dataUrl);
+      setGeminiResult(null);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function analyzeImage() {
+    if (!image) return;
+    setAnalyzing(true);
+    setGeminiResult(null);
+    try {
+      const res = await fetch("/api/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: image.base64, mimeType: image.mimeType }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setGeminiResult(data);
+    } catch (err) {
+      setGeminiResult({ value: "–", text: String(err) });
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
   function formatTime(sec: number) {
     const m = Math.floor(sec / 60)
       .toString()
@@ -159,6 +198,44 @@ export default function SessionWindow() {
         >
           Stop Session
         </button>
+      </div>
+
+      {/* Gemini image analysis */}
+      <div className="w-full max-w-sm flex flex-col gap-3 border-t border-gray-200 pt-4">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">
+            Analyze screenshot
+          </span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            className="text-sm text-gray-600 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+          />
+        </label>
+
+        {preview && (
+          <img
+            src={preview}
+            alt="preview"
+            className="w-full max-h-32 object-contain rounded border border-gray-200"
+          />
+        )}
+
+        <button
+          onClick={analyzeImage}
+          disabled={!image || analyzing}
+          className="px-4 py-1.5 rounded bg-blue-600 text-white text-sm font-medium disabled:opacity-40 hover:bg-blue-700 transition-colors"
+        >
+          {analyzing ? "Analyzing…" : "Analyze ▶"}
+        </button>
+
+        {geminiResult && (
+          <div className="flex flex-col items-center gap-1 py-3 bg-gray-50 rounded-lg border border-gray-200">
+            <span className="text-3xl font-bold">{geminiResult.value}</span>
+            <p className="text-sm text-gray-600 text-center px-3">{geminiResult.text}</p>
+          </div>
+        )}
       </div>
     </div>
   );
