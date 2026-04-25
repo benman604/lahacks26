@@ -55,7 +55,7 @@ export default function FeedSection({
   return (
     <main className="flex-1 flex flex-col gap-4 min-w-0">
       {/* Start lock-in bar */}
-      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
+      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 grid grid-cols-4 gap-3 items-end">
         <div className="flex flex-col gap-0.5">
           <label className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
             Subject
@@ -65,8 +65,7 @@ export default function FeedSection({
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="e.g. Organic Chem"
-            className={selectClass}
-            style={{ width: "9rem" }}
+            className={`${selectClass} w-full`}
           />
         </div>
 
@@ -79,14 +78,13 @@ export default function FeedSection({
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
             placeholder="e.g. 50 min"
-            className={selectClass}
-            style={{ width: "9rem" }}
+            className={`${selectClass} w-full`}
           />
         </div>
 
         <button
           onClick={openBlockers}
-          className="flex-1 py-3 rounded-lg text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+          className="col-span-2 py-2 rounded-lg text-white text-sm font-semibold hover:opacity-90 transition-opacity"
           style={{ backgroundColor: "var(--p2p-accent)" }}
         >
           Start lock-in
