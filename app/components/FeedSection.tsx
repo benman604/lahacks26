@@ -46,7 +46,8 @@ export default function FeedSection({
   openSession: () => void;
 }) {
   const [subject, setSubject] = useState("Organic Chem");
-  const [duration, setDuration] = useState("50 min");
+  const [duration, setDuration] = useState("50");
+  const [breakTime, setBreakTime] = useState("10");
   const [commentDraft, setCommentDraft] = useState("");
 
   const selectClass =
@@ -55,7 +56,8 @@ export default function FeedSection({
   return (
     <main className="flex-1 flex flex-col gap-4 min-w-0">
       {/* Start lock-in bar */}
-      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 grid grid-cols-4 gap-3 items-end">
+      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-col gap-3">
+        <div className="flex gap-3 items-end">
         <div className="flex flex-col gap-0.5">
           <label className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
             Subject
@@ -73,13 +75,37 @@ export default function FeedSection({
           <label className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
             Duration
           </label>
-          <input
-            type="text"
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            placeholder="e.g. 50 min"
-            className={`${selectClass} w-full`}
-          />
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value.replace(/\D/g, ""))}
+              placeholder="50"
+              className={`${selectClass} w-full`}
+            />
+            <span className="text-xs text-gray-400 shrink-0">min</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-0.5">
+          <label className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
+            Break time
+          </label>
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={breakTime}
+              onChange={(e) => setBreakTime(e.target.value.replace(/\D/g, ""))}
+              placeholder="10"
+              className={`${selectClass} w-full`}
+            />
+            <span className="text-xs text-gray-400 shrink-0">min</span>
+          </div>
+        </div>
         </div>
 
         <button
