@@ -58,10 +58,6 @@ export default function Home() {
       <LeftSidebar />
       <FeedSection openBlockers={openSession} />
       <RightSidebar />
-
-      <button onClick={testBlocking} className="px-6 py-3 rounded-full bg-white text-black hover:bg-gray-200 transition">
-        Test Blocking
-      </button>
     </div>
   );
 }
