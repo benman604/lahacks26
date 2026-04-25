@@ -1,27 +1,26 @@
 "use client";
 
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { emit } from "@tauri-apps/api/event";
 
 export default function GPTW() {
   async function close() {
     try {
-      await getCurrentWindow().close();
+      await emit("close-blockers");
     } catch (e) {
-      // fallback: log error so it's visible during debugging
       // eslint-disable-next-line no-console
-      console.error("failed to close window", e);
+      console.error("failed to emit close-blockers", e);
     }
   }
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/40">
-      <div className="flex flex-col items-center gap-6 bg-white/90 backdrop-blur-md px-10 py-8 rounded-2xl">
+      <div className="flex flex-col items-center gap-6 backdrop-blur-md px-10 py-8">
         
-        <h1 className="text-5xl font-bold text-gray-900">
+        <h1 className="text-5xl font-bold ">
           Hey!
         </h1>
 
-        <h3 className="text-lg text-gray-600">
+        <h3 className="text-lg ">
           Get back to work bud.
         </h3>
 

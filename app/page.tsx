@@ -1,95 +1,100 @@
 "use client";
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { currentMonitor, LogicalPosition, LogicalSize } from '@tauri-apps/api/window';
-import Image from "next/image";
+
+import React, { useEffect } from "react";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import {
+  availableMonitors,
+  LogicalPosition,
+  LogicalSize,
+} from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
+
+const blockerLabels: string[] = [];
 
 export default function Home() {
-  async function openTimer() {
-    const timer = new WebviewWindow('timer', {
-      url: '/session/gbtw',
-      decorations: false,
-      alwaysOnTop: true,
-      resizable: false,
-      transparent: true,
+  useEffect(() => {
+    let mounted = true;
+
+    const unlistenPromise = listen("close-blockers", async () => {
+      if (!mounted) return;
+
+      for (const label of blockerLabels.splice(0)) {
+        const w = await WebviewWindow.getByLabel(label);
+
+        if (w) {
+          try {
+            await w.close();
+          } catch (e) {
+            console.error("failed to close blocker", label, e);
+          }
+        }
+      }
     });
 
-    timer.once('tauri://created', async () => {
-      const monitor = await currentMonitor();
+    return () => {
+      mounted = false;
+      unlistenPromise.then((un) => un()).catch(() => {});
+    };
+  }, []);
 
-      if (!monitor) return;
+  async function openBlockers() {
+    const monitors = await availableMonitors();
 
-      const { width, height } = monitor.size;
-      const scale = monitor.scaleFactor;
+    for (let i = 0; i < monitors.length; i++) {
+      const m = monitors[i];
+      const label = `blocker-${i}`;
 
-      await timer.setPosition(new LogicalPosition(0, 0));
+      // prevent duplicates
+      const existing = await WebviewWindow.getByLabel(label);
+      if (existing) {
+        await existing.setFocus();
+        continue;
+      }
 
-      await timer.setSize(
-        new LogicalSize(width / scale, height / scale)
-      );
-    });
+      const blocker = new WebviewWindow(label, {
+        url: "/session/gbtw",
+        decorations: false,
+        alwaysOnTop: true,
+        resizable: false,
+        transparent: true,
+      });
 
-    timer.once('tauri://error', (e) => {
-      console.error('failed to create window', e);
-    });
+      blocker.once("tauri://created", async () => {
+        try {
+          const scale = m.scaleFactor;
+
+          // IMPORTANT: use monitor position + size (physical → convert)
+          await blocker.setPosition(
+            new LogicalPosition(m.position.x / scale, m.position.y / scale)
+          );
+
+          await blocker.setSize(
+            new LogicalSize(
+              m.size.width / scale,
+              m.size.height / scale
+            )
+          );
+        } catch (e) {
+          console.error("failed to size blocker", e);
+        }
+      });
+
+      blocker.once("tauri://error", (e) => {
+        console.error("failed to create blocker", e);
+      });
+
+      blockerLabels.push(label);
+    }
   }
-  
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            onClick={openTimer}
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Start Session
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="flex flex-col items-center justify-center min-h-screen">
+      <button
+        onClick={openBlockers}
+        className="px-6 py-3 rounded-full bg-black text-white"
+      >
+        Start Session
+      </button>
     </div>
   );
 }
