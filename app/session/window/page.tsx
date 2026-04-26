@@ -14,7 +14,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 
 const blockerLabels: string[] = [];
 const MAX_CONTEXT_SIZE = 5;
-const ANALYSIS_INTERVAL_MS = 20 * 1000; // analyze every 40 seconds
+const ANALYSIS_INTERVAL_MS = 100 * 1000; // analyze every 40 seconds
 
 type RawSessionDataWire = {
   title?: unknown;
@@ -52,6 +52,15 @@ export default function SessionWindow() {
   const [running, setRunning] = useState(false);
   const timerRef = useRef<number | null>(null);
   const [recordingEnabled, setRecordingEnabled] = useState(false);
+
+  // break timer state
+  const [onBreak, setOnBreak] = useState(false);
+  const [breakSecondsLeft, setBreakSecondsLeft] = useState<number>(0);
+  const [breakOvertime, setBreakOvertime] = useState<number>(0);
+  const [breakCooldownLeft, setBreakCooldownLeft] = useState<number>(0);
+  const [inBreakCooldown, setInBreakCooldown] = useState(false);
+  const breakTimerRef = useRef<number | null>(null);
+  const breakCooldownRef = useRef<number | null>(null);
 
   // screenshot helpers
   const streamRef = useRef<MediaStream | null>(null);
@@ -133,6 +142,8 @@ export default function SessionWindow() {
 
   const analyzeCurrentScreenshot = useCallback(async () => {
     try {
+      // don't analyze if on a break
+      if (onBreak) return;
       // ensure recording active and video present
       if (!streamRef.current || !videoRef.current) throw new Error("Recording not enabled");
       if (!canvasRef.current) canvasRef.current = document.createElement("canvas");
@@ -169,7 +180,7 @@ export default function SessionWindow() {
     } catch (e) {
       console.error("analyzeCurrentScreenshot failed", e);
     }
-  }, [rawSessionData?.subject]);
+  }, [rawSessionData?.subject, onBreak]);
 
   useEffect(() => {
     const unlistenTrigger = listen("trigger-blockers", async () => {
@@ -186,6 +197,8 @@ export default function SessionWindow() {
       unlistenTrigger.then((un) => un()).catch(() => {});
       unlistenClose.then((un) => un()).catch(() => {});
       stopTimer();
+      if (breakTimerRef.current) clearInterval(breakTimerRef.current);
+      if (breakCooldownRef.current) clearInterval(breakCooldownRef.current);
       closeBlockers();
     };
   }, []);
@@ -288,6 +301,56 @@ export default function SessionWindow() {
     else startTimer();
   }
 
+  function startBreak() {
+    if (!rawSessionData) return;
+    // pause the main timer
+    stopTimer();
+    // set break state
+    setOnBreak(true);
+    const breakDuration = rawSessionData.idealBreakTimeMinutes * 60;
+    setBreakSecondsLeft(breakDuration);
+    // start break timer countdown (can go negative)
+    breakTimerRef.current = window.setInterval(() => {
+      setBreakSecondsLeft((s) => s - 1);
+    }, 1000);
+  }
+
+  function endBreak() {
+    if (!rawSessionData) return;
+    // clear break timer
+    if (breakTimerRef.current) {
+      clearInterval(breakTimerRef.current);
+      breakTimerRef.current = null;
+    }
+    // accumulate any overtime (negative seconds)
+    if (breakSecondsLeft < 0) {
+      setBreakOvertime((prev) => prev + Math.abs(breakSecondsLeft));
+    }
+    // reset break state
+    setOnBreak(false);
+    setBreakSecondsLeft(0);
+    // start cooldown
+    const breakCooldown = rawSessionData.idealBreakTimeMinutes * 60;
+    setInBreakCooldown(true);
+    setBreakCooldownLeft(breakCooldown);
+    breakCooldownRef.current = window.setInterval(() => {
+      setBreakCooldownLeft((s) => {
+        const newSeconds = s - 1;
+        if (newSeconds <= 0) {
+          if (breakCooldownRef.current) {
+            clearInterval(breakCooldownRef.current);
+            breakCooldownRef.current = null;
+          }
+          setInBreakCooldown(false);
+          return 0;
+        }
+        return newSeconds;
+      });
+    }, 1000);
+    // resume main timer
+    startTimer();
+  }
+
   function formatTime(sec: number) {
     const m = Math.floor(sec / 60)
       .toString()
@@ -320,12 +383,32 @@ export default function SessionWindow() {
 				<div>
 					<div className="flex flex-col items-center">
 						<h2 className="text-lg font-semibold">Session Controller</h2>
-						<div className="mt-2 text-2xl">{formatTime(secondsLeft)}</div>
-						<div className="mt-2 flex gap-2 items-center">
-							<button onClick={toggleTimer} className="px-3 py-1 rounded bg-blue-600 text-white">
-								{running ? "Pause" : "Play"}
-							</button>
-							<button
+					<div className="mt-2 text-2xl">{onBreak ? formatTime(Math.abs(breakSecondsLeft)) : formatTime(secondsLeft)}</div>
+					{onBreak && breakSecondsLeft < 0 && (
+						<div className="mt-1 text-sm text-orange-600">Overtime: {formatTime(Math.abs(breakSecondsLeft))}</div>
+					)}
+					{inBreakCooldown && (
+						<div className="mt-1 text-sm text-yellow-600">Cooldown: {formatTime(breakCooldownLeft)}</div>
+					)}
+					{breakOvertime > 0 && (
+						<div className="mt-1 text-sm text-gray-600">Break overtime: {formatTime(breakOvertime)}</div>
+					)}
+					<div className="mt-2 flex gap-2 items-center">
+						{!onBreak && (
+							<button onClick={startBreak} disabled={inBreakCooldown} className={`px-3 py-1 rounded ${
+								inBreakCooldown
+									? "bg-gray-400 text-white cursor-not-allowed"
+									: "bg-blue-600 text-white hover:bg-blue-700"
+							}`}>
+									Take a break
+								</button>
+							)}
+							{onBreak && (
+								<button onClick={endBreak} className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700">
+									End break
+								</button>
+							)}
+							{/* <button
 								onClick={enableRecording}
 								disabled={recordingEnabled}
 								className={`px-3 py-1 rounded ${
@@ -335,7 +418,7 @@ export default function SessionWindow() {
 								}`}
 							>
 								{recordingEnabled ? "✓ Recording" : "Enable Recording"}
-							</button>
+							</button> */}
 						</div>
 					</div>
             <div className="flex gap-2">

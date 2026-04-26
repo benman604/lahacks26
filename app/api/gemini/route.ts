@@ -73,6 +73,8 @@ export async function POST(req: Request) {
     content.push({ type: "text", text: txt });
   }
 
+  console.log("Constructed message content for Gemini", { content });
+
   if (imageBase64) {
     content.push({ type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}` } });
   }
