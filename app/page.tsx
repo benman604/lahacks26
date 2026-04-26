@@ -17,7 +17,6 @@ const sessions: SessionData[] = [
     totalBreakTimeMinutes: 5,
     startTimestamp: new Date("2026-04-25T17:49:00"),
     endTimestamp: new Date("2026-04-25T19:29:00"),
-    distractionTimes: [],
     focusElements: [
       {
         startTimestamp: new Date("2026-04-25T17:49:00"),
@@ -86,7 +85,6 @@ const sessions: SessionData[] = [
     totalBreakTimeMinutes: 8,
     startTimestamp: new Date("2026-04-25T11:02:00"),
     endTimestamp: new Date("2026-04-25T12:02:00"),
-    distractionTimes: [],
     focusElements: [
       {
         startTimestamp: new Date("2026-04-25T11:02:00"),
@@ -211,7 +209,6 @@ const sessions: SessionData[] = [
       },
     ],
     idleTimeSeconds: 1140,
-    distractionTimes: [],
   },
 ];
 

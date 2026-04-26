@@ -47,7 +47,6 @@ export type SessionData = {
 	focusElements: FocusElement[];
 	appElements: AppElement[];
 	idleTimeSeconds: number;
-	distractionTimes: Date[];
 }
 
 // Define a function Adherence(average, ideal) that outputs a score from 0-100 based on the formula above
