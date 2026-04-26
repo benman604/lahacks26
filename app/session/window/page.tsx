@@ -177,6 +177,10 @@ export default function SessionWindow() {
         isIdle: data.isIdle,
       };
       appendHistory(entry);
+
+      if (data.focusType === "distracted") {
+        await openBlockers();
+      }
     } catch (e) {
       console.error("analyzeCurrentScreenshot failed", e);
     }
