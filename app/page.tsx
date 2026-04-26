@@ -77,6 +77,7 @@ const sessions: SessionData[] = [
       },
     ],
     idleTimeSeconds: 240,
+    distractionTimes: [],
   },
   {
     userId: "esther",
@@ -124,6 +125,7 @@ const sessions: SessionData[] = [
       },
     ],
     idleTimeSeconds: 90,
+    distractionTimes: [],
   },
   {
     userId: "andyroo",
@@ -206,6 +208,7 @@ const sessions: SessionData[] = [
       },
     ],
     idleTimeSeconds: 1140,
+    distractionTimes: [],
   },
 ];
 
