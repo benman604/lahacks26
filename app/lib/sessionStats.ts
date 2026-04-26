@@ -29,15 +29,18 @@ export function clampPercent(value: number) {
 	return Math.max(0, Math.min(100, value));
 }
 
-function staminaScoreFromAverageGapMinutes(averageGapMinutes: number, targetMinutes = 60): number {
+function staminaScoreFromLongestFocusStreakMinutes(
+	longestFocusStreakMinutes: number,
+	targetMinutes = 60,
+): number {
 	if (targetMinutes <= 0) return 0;
-	if (averageGapMinutes >= targetMinutes) return 100;
-	if (averageGapMinutes <= 0) return 0;
+	if (longestFocusStreakMinutes >= targetMinutes) return 100;
+	if (longestFocusStreakMinutes <= 0) return 0;
 
-	// Use a normalized sigmoid curve (similar spirit to `adherence`, but reversed: higher gap => higher score).
+	// Use a normalized sigmoid curve (similar spirit to `adherence`: longer streak => higher score).
 	const alpha = 10 / targetMinutes;
 	const center = targetMinutes / 2;
-	const raw = 1 / (1 + Math.exp(-alpha * (averageGapMinutes - center)));
+	const raw = 1 / (1 + Math.exp(-alpha * (longestFocusStreakMinutes - center)));
 	const raw0 = 1 / (1 + Math.exp(-alpha * (0 - center)));
 	const rawT = 1 / (1 + Math.exp(-alpha * (targetMinutes - center)));
 	const normalized = (raw - raw0) / (rawT - raw0);
@@ -45,23 +48,30 @@ function staminaScoreFromAverageGapMinutes(averageGapMinutes: number, targetMinu
 	return Math.round(clampPercent(normalized * 100));
 }
 
-function computeAverageMinutesBetweenDistractions(distractionTimes: Date[] | undefined): number {
-	if (!distractionTimes || distractionTimes.length < 2) return Infinity;
+function computeLongestFocusedStreakMinutes(focusElements: SessionData["focusElements"]): number {
+	if (focusElements.length === 0) return 0;
 
-	const times = [...distractionTimes]
-		.map((d) => new Date(d))
-		.sort((a, b) => a.getTime() - b.getTime());
+	const elements = [...focusElements].sort(
+		(a, b) => new Date(a.startTimestamp).getTime() - new Date(b.startTimestamp).getTime(),
+	);
 
-	let totalGapSeconds = 0;
-	let gapCount = 0;
-	for (let i = 1; i < times.length; i += 1) {
-		const gapSeconds = secondsBetween(times[i - 1], times[i]);
-		totalGapSeconds += gapSeconds;
-		gapCount += 1;
+	let currentStreakSeconds = 0;
+	let longestStreakSeconds = 0;
+
+	for (const el of elements) {
+		const durationSeconds = secondsBetween(el.startTimestamp, el.endTimestamp);
+		const isFocused = el.focusType === "productive" || el.focusType === "supportive";
+
+		if (isFocused) {
+			currentStreakSeconds += durationSeconds;
+		} else {
+			longestStreakSeconds = Math.max(longestStreakSeconds, currentStreakSeconds);
+			currentStreakSeconds = 0;
+		}
 	}
 
-	if (gapCount === 0) return Infinity;
-	return totalGapSeconds / gapCount / 60;
+	longestStreakSeconds = Math.max(longestStreakSeconds, currentStreakSeconds);
+	return longestStreakSeconds / 60;
 }
 
 function calculateFlowScore(
@@ -138,10 +148,15 @@ export function computeSessionSummary(session: SessionData): SessionSummary {
 			0,
 		) / 60;
 
-	const averageGapMinutes = computeAverageMinutesBetweenDistractions(session.distractionTimes);
-	const stamina = Number.isFinite(averageGapMinutes)
-		? staminaScoreFromAverageGapMinutes(averageGapMinutes, 60)
-		: 100;
+	const effectiveDistractionTimes =
+		session.distractionTimes.length > 0
+			? session.distractionTimes
+			: session.focusElements
+					.filter((el) => el.focusType === "distracted")
+					.map((el) => el.startTimestamp);
+
+	const longestFocusedStreakMinutes = computeLongestFocusedStreakMinutes(session.focusElements);
+	const stamina = staminaScoreFromLongestFocusStreakMinutes(longestFocusedStreakMinutes, 60);
 
 	return {
 		username: "You",
@@ -153,7 +168,7 @@ export function computeSessionSummary(session: SessionData): SessionSummary {
 		productivityRate: totalSeconds > 0 ? clampPercent((focusSeconds / totalSeconds) * 100) : 0,
 		stamina,
 		adherenceToBreakTime: adherence(totalBreakMinutes, session.totalBreakTimeMinutes) * 100,
-		flowScore: calculateFlowScore(session.focusElements, totalSeconds, session.distractionTimes?.length || 0),
+		flowScore: calculateFlowScore(session.focusElements, totalSeconds, effectiveDistractionTimes.length),
 		idleRatio:
 			totalSeconds > 0 ? clampPercent((session.idleTimeSeconds / totalSeconds) * 100) : 0,
 	};
@@ -261,5 +276,3 @@ export function computeAverageMetrics(sessionList: SessionData[]) {
     activity: Math.round(metricsTotals.activity / divisor),
   };
 }
-
-

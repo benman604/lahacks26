@@ -9,10 +9,6 @@ type Props = {
   onNext: () => void;
 };
 
-function secondsBetween(start: Date, end: Date) {
-  return Math.max(1, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 1000));
-}
-
 function toMs(value: Date) {
   return new Date(value).getTime();
 }

@@ -13,6 +13,34 @@ import { SessionData, type RawSessionData } from "./types";
 const sessions: SessionData[] = [
   {
     userId: "ben",
+    title: "Evening Review — Microeconomics",
+    totalBreakTimeMinutes: 8,
+    startTimestamp: new Date("2026-04-25T20:00:00"),
+    endTimestamp: new Date("2026-04-25T21:20:00"),
+    focusElements: [
+      {
+        startTimestamp: new Date("2026-04-25T20:00:00"),
+        endTimestamp: new Date("2026-04-25T21:20:00"),
+        focusType: "productive",
+      },
+    ],
+    appElements: [
+      {
+        startTimestamp: new Date("2026-04-25T20:00:00"),
+        endTimestamp: new Date("2026-04-25T20:52:00"),
+        activityName: "Problem set",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T20:52:00"),
+        endTimestamp: new Date("2026-04-25T21:20:00"),
+        activityName: "Notes review",
+      },
+    ],
+    idleTimeSeconds: 60,
+    distractionTimes: [],
+  },
+  {
+    userId: "ben",
     title: "Afternoon Study — Organic Chem",
     totalBreakTimeMinutes: 10,
     startTimestamp: new Date("2026-04-25T17:49:00"),
@@ -20,11 +48,26 @@ const sessions: SessionData[] = [
     focusElements: [
       {
         startTimestamp: new Date("2026-04-25T17:49:00"),
+        endTimestamp: new Date("2026-04-25T18:02:00"),
+        focusType: "productive",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T18:02:00"),
+        endTimestamp: new Date("2026-04-25T18:04:00"),
+        focusType: "distracted",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T18:04:00"),
         endTimestamp: new Date("2026-04-25T18:39:00"),
         focusType: "productive",
       },
       {
         startTimestamp: new Date("2026-04-25T18:39:00"),
+        endTimestamp: new Date("2026-04-25T18:39:10"),
+        focusType: "distracted",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T18:39:10"),
         endTimestamp: new Date("2026-04-25T18:49:00"),
         focusType: "break",
       },
@@ -35,11 +78,36 @@ const sessions: SessionData[] = [
       },
       {
         startTimestamp: new Date("2026-04-25T19:09:00"),
+        endTimestamp: new Date("2026-04-25T19:11:00"),
+        focusType: "break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T19:11:00"),
+        endTimestamp: new Date("2026-04-25T19:12:00"),
+        focusType: "distracted",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T19:12:00"),
+        endTimestamp: new Date("2026-04-25T19:12:10"),
+        focusType: "distracted",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T19:12:10"),
         endTimestamp: new Date("2026-04-25T19:19:00"),
         focusType: "break",
       },
       {
         startTimestamp: new Date("2026-04-25T19:19:00"),
+        endTimestamp: new Date("2026-04-25T19:23:00"),
+        focusType: "productive",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T19:23:00"),
+        endTimestamp: new Date("2026-04-25T19:24:00"),
+        focusType: "distracted",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T19:24:00"),
         endTimestamp: new Date("2026-04-25T19:29:00"),
         focusType: "productive",
       }
@@ -77,7 +145,13 @@ const sessions: SessionData[] = [
       },
     ],
     idleTimeSeconds: 240,
-    distractionTimes: [],
+    distractionTimes: [
+      new Date("2026-04-25T18:02:00"),
+      new Date("2026-04-25T18:39:00"),
+      new Date("2026-04-25T19:11:00"),
+      new Date("2026-04-25T19:12:00"),
+      new Date("2026-04-25T19:23:00"),
+    ],
   },
   {
     userId: "esther",
@@ -88,16 +162,41 @@ const sessions: SessionData[] = [
     focusElements: [
       {
         startTimestamp: new Date("2026-04-25T11:02:00"),
+        endTimestamp: new Date("2026-04-25T11:34:00"),
+        focusType: "productive",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T11:34:00"),
+        endTimestamp: new Date("2026-04-25T11:35:00"),
+        focusType: "distracted",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T11:35:00"),
         endTimestamp: new Date("2026-04-25T11:47:00"),
         focusType: "productive",
       },
       {
         startTimestamp: new Date("2026-04-25T11:47:00"),
+        endTimestamp: new Date("2026-04-25T11:47:10"),
+        focusType: "distracted",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T11:47:10"),
         endTimestamp: new Date("2026-04-25T11:55:00"),
         focusType: "break",
       },
       {
         startTimestamp: new Date("2026-04-25T11:55:00"),
+        endTimestamp: new Date("2026-04-25T11:58:00"),
+        focusType: "productive",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T11:58:00"),
+        endTimestamp: new Date("2026-04-25T11:59:00"),
+        focusType: "distracted",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T11:59:00"),
         endTimestamp: new Date("2026-04-25T12:02:00"),
         focusType: "productive",
       },
@@ -125,7 +224,11 @@ const sessions: SessionData[] = [
       },
     ],
     idleTimeSeconds: 90,
-    distractionTimes: [],
+    distractionTimes: [
+      new Date("2026-04-25T11:34:00"),
+      new Date("2026-04-25T11:47:00"),
+      new Date("2026-04-25T11:58:00"),
+    ],
   },
   {
     userId: "andyroo",
@@ -133,7 +236,11 @@ const sessions: SessionData[] = [
     totalBreakTimeMinutes: 10,
     startTimestamp: new Date("2026-04-25T21:10:00"),
     endTimestamp: new Date("2026-04-25T22:40:00"),
-    distractionTimes: [],
+    distractionTimes: [
+      new Date("2026-04-25T21:20:00"),
+      new Date("2026-04-25T22:07:00"),
+      new Date("2026-04-25T21:34:00"),
+    ],
     focusElements: [
       {
         startTimestamp: new Date("2026-04-25T21:10:00"),
@@ -141,12 +248,27 @@ const sessions: SessionData[] = [
         focusType: "productive",
       },
       {
+        startTimestamp: new Date("2026-04-25T21:20:00"),
+        endTimestamp: new Date("2026-04-25T21:21:00"),
+        focusType: "distracted",
+      },
+      {
         startTimestamp: new Date("2026-04-25T21:16:00"),
         endTimestamp: new Date("2026-04-25T21:34:00"),
         focusType: "break",
       },
       {
+        startTimestamp: new Date("2026-04-25T22:07:00"),
+        endTimestamp: new Date("2026-04-25T22:08:00"),
+        focusType: "distracted",
+      },
+      {
         startTimestamp: new Date("2026-04-25T21:34:00"),
+        endTimestamp: new Date("2026-04-25T21:34:10"),
+        focusType: "distracted",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:34:10"),
         endTimestamp: new Date("2026-04-25T21:48:00"),
         focusType: "break",
       },
@@ -274,6 +396,7 @@ function normalizeRawSessionData(payload: RawSessionDataWire): RawSessionData {
 
   return {
     title: typeof payload.title === "string" ? payload.title : "Session",
+    subject: typeof payload.subject === "string" ? payload.subject : "",
     totalBreakTimeMinutes: toPositiveNumber(payload.totalBreakTimeMinutes, 10),
     startTimestamp,
     endTimestamp,
@@ -325,6 +448,7 @@ export default function Home() {
 
     return {
       title: subject,
+      subject,
       totalBreakTimeMinutes,
       startTimestamp,
       endTimestamp: startTimestamp,

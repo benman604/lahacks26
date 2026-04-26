@@ -30,6 +30,7 @@ export type ScreenshotData = {
 
 export type RawSessionData = {
 	title: string;
+	subject: string;
 	totalBreakTimeMinutes: number;
 	startTimestamp: Date;
 	endTimestamp: Date;
@@ -60,7 +61,7 @@ export type SessionSummary = {
 	appElements: AppElement[];
 	// Percentage of time spent focused during the session (focused time divided by total session time)
 	productivityRate: number;
-	// Stamina: a 0-100 score based on average minutes between distractions (100 at 60 minutes)
+	// Stamina: a 0-100 score based on the longest focused streak without a distraction (100 at 60 minutes)
 	stamina: number;
 	// Adherence(total actual break time, allocated break time)
 	adherenceToBreakTime: number;
@@ -79,4 +80,3 @@ export type SessionMetrics = {
 }
 
 export type SessionStats = SessionMetrics;
-

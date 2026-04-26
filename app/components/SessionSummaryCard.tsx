@@ -297,23 +297,25 @@ export default function SessionSummaryCard({
   const totalSeconds = secondsBetween(summary.startTimestamp, summary.endTimestamp);
 
   const focusTimeline = summary.focusElements.map((el) => {
-          const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
-          
-          const color =
-            el.focusType === "productive"
-              ? "#87ae73"
-              : el.focusType === "supportive"
-                ? "#fbbf24"
-                : el.focusType === "neutral"
-                  ? "#b0a4d6"
-                  : "#4f8bc3";
+    const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
 
-          return {
-            width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
-            color,
-            tooltip: `${el.focusType} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
-          };
-        })
+    const color =
+      el.focusType === "productive"
+        ? "#87ae73"
+        : el.focusType === "supportive"
+          ? "#fbbf24"
+          : el.focusType === "neutral"
+            ? "#b0a4d6"
+            : el.focusType === "distracted"
+              ? "#dc2626"
+              : "#4f8bc3";
+
+    return {
+      width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
+      color,
+      tooltip: `${el.focusType} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
+    };
+  });
 
   const basePalette = ["#904c77", "#e49ab0", "#ecb8a5", "#eccfc3", "#957d95"];
   const tintPalette = basePalette.map((c) => mixHex(c, "#ffffff", 0.28));
@@ -399,7 +401,7 @@ export default function SessionSummaryCard({
               <span>{formatRange(summary.startTimestamp, summary.endTimestamp)}</span>
             </div>
 
-            <div className="flex h-8 overflow-visible rounded-full bg-gray-100">
+            <div className="relative flex h-8 w-full overflow-visible rounded-full bg-gray-100">
               {focusTimeline.map((segment, i) => (
                 <TimelineSegment
                   key={i}
@@ -433,4 +435,3 @@ export default function SessionSummaryCard({
     </article>
   );
 }
-
