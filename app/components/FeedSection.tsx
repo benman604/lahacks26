@@ -5,7 +5,11 @@ import { useEffect, useState } from "react";
 import SessionSummaryCard from "./SessionSummaryCard";
 import type { SessionData } from "../types";
 import { MOCK_SESSIONS } from "../lib/mockSessions";
-import { loadLocalSessions } from "../lib/localSessions";
+import {
+  appendLocalSession,
+  loadLocalSessions,
+  subscribeToSessionsUpdated,
+} from "../lib/localSessions";
 import {
   computeAverageMetrics,
   computeSessionMetrics,
@@ -15,6 +19,90 @@ import {
   getCurrentWeekBounds,
   secondsBetween,
 } from "../lib/sessionStats";
+
+function buildDemoSessionFromInputs({
+  subject,
+  durationMinutes,
+  breakMinutes,
+}: {
+  subject: string;
+  durationMinutes: number;
+  breakMinutes: number;
+}): SessionData {
+  const randInt = (min: number, max: number) =>
+    Math.floor(Math.random() * (max - min + 1)) + min;
+
+  const jitteredDuration = Math.max(20, durationMinutes + randInt(-10, 15));
+  const sessionTypePool = ["focus-first", "balanced", "choppy"] as const;
+  const sessionType = sessionTypePool[randInt(0, sessionTypePool.length - 1)];
+
+  const focusStartRatio =
+    sessionType === "focus-first"
+      ? randInt(42, 58) / 100
+      : sessionType === "balanced"
+        ? randInt(30, 45) / 100
+        : randInt(22, 35) / 100;
+  const breakRatio = Math.min(0.28, Math.max(0.07, (breakMinutes + randInt(-3, 5)) / 100));
+  const distractRatio =
+    sessionType === "focus-first"
+      ? randInt(8, 16) / 100
+      : sessionType === "balanced"
+        ? randInt(12, 22) / 100
+        : randInt(18, 30) / 100;
+
+  const focusOneMinutes = Math.max(8, Math.floor(jitteredDuration * focusStartRatio));
+  const actualBreakMinutes = Math.max(3, Math.floor(jitteredDuration * breakRatio));
+  const distractedMinutes = Math.max(4, Math.floor(jitteredDuration * distractRatio));
+  const focusTwoMinutes = Math.max(
+    6,
+    jitteredDuration - focusOneMinutes - actualBreakMinutes - distractedMinutes
+  );
+
+  const end = new Date();
+  const startJitterMinutes = randInt(0, 40);
+  const start = new Date(
+    end.getTime() - (focusOneMinutes + actualBreakMinutes + distractedMinutes + focusTwoMinutes + startJitterMinutes) * 60 * 1000
+  );
+
+  const t1 = new Date(start.getTime() + focusOneMinutes * 60 * 1000);
+  const t2 = new Date(t1.getTime() + actualBreakMinutes * 60 * 1000);
+  const t3 = new Date(t2.getTime() + distractedMinutes * 60 * 1000);
+
+  const studyApps = [
+    "Lecture notes",
+    "Practice problems",
+    "Textbook reading",
+    "Flashcards",
+    "Problem set",
+    "Review sheet",
+    `${subject || "Subject"} notes`,
+  ];
+  const distractApps = ["Messages", "Social media", "Video clips", "Online shopping", "Group chat"];
+
+  const pick = (arr: string[]) => arr[randInt(0, arr.length - 1)];
+  const demoUsers = ["andyroo", "ben", "esther", "andreww"];
+
+  return {
+    userId: demoUsers[randInt(0, demoUsers.length - 1)],
+    title: `Lock-in - ${subject.trim() || "General Study"}`,
+    idealBreakTimeMinutes: breakMinutes,
+    startTimestamp: start,
+    endTimestamp: end,
+    focusElements: [
+      { startTimestamp: start, endTimestamp: t1, focusType: "focus" },
+      { startTimestamp: t1, endTimestamp: t2, focusType: "break" },
+      { startTimestamp: t2, endTimestamp: t3, focusType: "distracted" },
+      { startTimestamp: t3, endTimestamp: end, focusType: "focus" },
+    ],
+    appElements: [
+      { startTimestamp: start, endTimestamp: t1, activityName: pick(studyApps) },
+      { startTimestamp: t1, endTimestamp: t2, activityName: "Break" },
+      { startTimestamp: t2, endTimestamp: t3, activityName: pick(distractApps) },
+      { startTimestamp: t3, endTimestamp: end, activityName: pick(studyApps) },
+    ],
+    idleTimeSeconds: Math.round((focusOneMinutes + actualBreakMinutes + distractedMinutes + focusTwoMinutes) * 60 * (randInt(2, 14) / 100)),
+  };
+}
 
 export default function FeedSection({
   openBlockers,
@@ -29,18 +117,24 @@ export default function FeedSection({
   useEffect(() => {
     let alive = true;
 
-    loadLocalSessions()
-      .then((nextSessions) => {
-        if (alive) {
-          setSessions(nextSessions);
-        }
-      })
-      .catch((error) => {
-        console.error("Failed to load sessions", error);
-      });
+    const refreshSessions = () => {
+      loadLocalSessions()
+        .then((nextSessions) => {
+          if (alive) {
+            setSessions(nextSessions);
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to load sessions", error);
+        });
+    };
+
+    refreshSessions();
+    const unsubscribe = subscribeToSessionsUpdated(refreshSessions);
 
     return () => {
       alive = false;
+      unsubscribe();
     };
   }, []);
 
@@ -65,6 +159,28 @@ export default function FeedSection({
   ];
   const { start: weekStart, end: weekEnd } = getCurrentWeekBounds();
   const weekRange = formatWeekRange(weekStart, weekEnd);
+
+  async function appendDemoSession() {
+    const parsedDuration = Math.max(1, Number.parseInt(duration || "50", 10) || 50);
+    const parsedBreak = Math.max(1, Number.parseInt(breakTime || "10", 10) || 10);
+
+    const nextSession = buildDemoSessionFromInputs({
+      subject,
+      durationMinutes: parsedDuration,
+      breakMinutes: parsedBreak,
+    });
+
+    // Add compact metrics/timeline for immediate rendering even without raw playback data.
+    nextSession.summaryMetrics = computeSessionMetrics(nextSession);
+
+    setSessions((prev) => [nextSession, ...prev]);
+
+    try {
+      await appendLocalSession(nextSession);
+    } catch (error) {
+      console.error("Failed to append local session", error);
+    }
+  }
 
   return (
     <main className="flex-1 flex flex-col gap-4 min-w-0">
@@ -127,6 +243,13 @@ export default function FeedSection({
           style={{ backgroundColor: "var(--p2p-accent)" }}
         >
           Start lock-in
+        </button>
+
+        <button
+          onClick={appendDemoSession}
+          className="w-full py-2 rounded-lg text-sm font-semibold border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 transition-colors"
+        >
+          Save demo session
         </button>
 
         <section className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 flex flex-col gap-2">

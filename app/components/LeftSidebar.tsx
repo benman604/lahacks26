@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import type { SessionData } from "../types";
-import { loadLocalSessions } from "../lib/localSessions";
+import { loadLocalSessions, subscribeToSessionsUpdated } from "../lib/localSessions";
 import { MOCK_SESSIONS } from "../lib/mockSessions";
 import { computeAverageMetrics, computeLifetimeStats } from "../lib/sessionStats";
 
@@ -13,18 +13,24 @@ export default function LeftSidebar() {
   useEffect(() => {
     let alive = true;
 
-    loadLocalSessions()
-      .then((nextSessions) => {
-        if (alive) {
-          setSessions(nextSessions);
-        }
-      })
-      .catch((error) => {
-        console.error("Failed to load sessions", error);
-      });
+    const refreshSessions = () => {
+      loadLocalSessions()
+        .then((nextSessions) => {
+          if (alive) {
+            setSessions(nextSessions);
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to load sessions", error);
+        });
+    };
+
+    refreshSessions();
+    const unsubscribe = subscribeToSessionsUpdated(refreshSessions);
 
     return () => {
       alive = false;
+      unsubscribe();
     };
   }, []);
 

@@ -11,6 +11,29 @@ import type {
 import { MOCK_SESSIONS } from "./mockSessions";
 import { computeSessionMetrics, secondsBetween } from "./sessionStats";
 
+const SESSIONS_UPDATED_EVENT = "p2p:sessions-updated";
+
+function notifySessionsUpdated() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new Event(SESSIONS_UPDATED_EVENT));
+}
+
+export function subscribeToSessionsUpdated(listener: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const handler = () => listener();
+  window.addEventListener(SESSIONS_UPDATED_EVENT, handler);
+
+  return () => {
+    window.removeEventListener(SESSIONS_UPDATED_EVENT, handler);
+  };
+}
+
 type RawFocusElement = {
   startTimestamp: string;
   endTimestamp: string;
@@ -218,10 +241,12 @@ export async function loadLocalSessions(): Promise<SessionData[]> {
     if (stored.length === 0) {
       const seed = MOCK_SESSIONS.map(toRawSessionSummary);
       await invoke("replace_sessions", { sessions: seed });
+      notifySessionsUpdated();
       stored = await invoke<RawSessionData[]>("list_sessions");
     } else if (stored.some((session) => !isSummaryOnly(session))) {
       const compact = stored.map(compactRawSession);
       await invoke("replace_sessions", { sessions: compact });
+      notifySessionsUpdated();
       stored = await invoke<RawSessionData[]>("list_sessions");
     }
 
@@ -239,6 +264,7 @@ export async function appendLocalSession(session: SessionData): Promise<void> {
 
   const summaryPayload = toRawSessionSummary(session);
   await invoke("append_session", { session: summaryPayload });
+  notifySessionsUpdated();
 }
 
 export function toRawSessionForDebug(session: SessionData): RawSessionData {
