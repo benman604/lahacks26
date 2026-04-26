@@ -31,7 +31,6 @@ export type ScreenshotData = {
 export type RawSessionData = {
 	title: string;
 	subject: string;
-	plannedDurationMinutes: number;
 	idealBreakTimeMinutes: number;
 	startTimestamp: Date;
 	endTimestamp: Date;

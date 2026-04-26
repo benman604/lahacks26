@@ -17,7 +17,6 @@ const ANALYSIS_INTERVAL_MS = 100 * 1000; // analyze every 40 seconds
 type RawSessionDataWire = {
   title?: unknown;
   subject?: unknown;
-  plannedDurationMinutes?: unknown;
   idealBreakTimeMinutes?: unknown;
   startTimestamp?: unknown;
   endTimestamp?: unknown;
@@ -115,15 +114,12 @@ export default function SessionWindow() {
       if (!incoming) return;
 
       const now = new Date();
-      const plannedDurationMinutes = toPositiveNumber(incoming.plannedDurationMinutes, 50);
       const startTimestamp = toDate(incoming.startTimestamp, now);
-      const endFallback = new Date(startTimestamp.getTime() + plannedDurationMinutes * 60_000);
-      const endTimestamp = toDate(incoming.endTimestamp, endFallback);
+      const endTimestamp = toDate(incoming.endTimestamp, now);
 
       setRawSessionData({
         title: typeof incoming.title === "string" ? incoming.title : "Session",
         subject: typeof incoming.subject === "string" ? incoming.subject : "",
-        plannedDurationMinutes,
         idealBreakTimeMinutes: toPositiveNumber(incoming.idealBreakTimeMinutes, 10),
         startTimestamp,
         endTimestamp,
@@ -373,6 +369,7 @@ export default function SessionWindow() {
 
     const sessionEndPayload: RawSessionData = {
       ...rawSessionData,
+      endTimestamp: new Date(),
       data: historyRef.current.slice(),
     };
 

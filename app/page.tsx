@@ -57,7 +57,6 @@ type ScreenshotDataWire = {
 type RawSessionDataWire = {
   title?: unknown;
   subject?: unknown;
-  plannedDurationMinutes?: unknown;
   idealBreakTimeMinutes?: unknown;
   startTimestamp?: unknown;
   endTimestamp?: unknown;
@@ -84,10 +83,8 @@ function toPositiveNumber(value: unknown, fallback: number) {
 
 function normalizeRawSessionData(payload: RawSessionDataWire): RawSessionData {
   const now = new Date();
-  const plannedDurationMinutes = toPositiveNumber(payload.plannedDurationMinutes, 50);
   const startTimestamp = toDate(payload.startTimestamp, now);
-  const endFallback = new Date(startTimestamp.getTime() + plannedDurationMinutes * 60_000);
-  const endTimestamp = toDate(payload.endTimestamp, endFallback);
+  const endTimestamp = toDate(payload.endTimestamp, now);
 
   const data: RawSessionData["data"] = Array.isArray(payload.data)
     ? payload.data.map((entry) => {
@@ -109,7 +106,6 @@ function normalizeRawSessionData(payload: RawSessionDataWire): RawSessionData {
   return {
     title: typeof payload.title === "string" ? payload.title : "Session",
     subject: typeof payload.subject === "string" ? payload.subject : "",
-    plannedDurationMinutes,
     idealBreakTimeMinutes: toPositiveNumber(payload.idealBreakTimeMinutes, 10),
     startTimestamp,
     endTimestamp,
@@ -161,24 +157,20 @@ export default function Home() {
     const initial = posts[0]?.title ? deriveSubjectFromTitle(posts[0].title) : "";
     return initial || "Organic Chem";
   });
-  const [duration, setDuration] = React.useState("50");
   const [breakTime, setBreakTime] = React.useState("10");
 
   function buildRawSessionData(): RawSessionData {
-    const plannedDurationMinutes = parsePositiveInt(duration, 50);
     const idealBreakTimeMinutes = parsePositiveInt(breakTime, 10);
     const startTimestamp = new Date();
-    const endTimestamp = new Date(startTimestamp.getTime() + plannedDurationMinutes * 60_000);
     const cleanSubject = subject.trim() || (highlightedPost ? deriveSubjectFromTitle(highlightedPost.title) : "");
     const sessionTitle = cleanSubject || highlightedPost?.title || "Session";
 
     return {
       title: sessionTitle,
       subject: cleanSubject || "",
-      plannedDurationMinutes,
       idealBreakTimeMinutes,
       startTimestamp,
-      endTimestamp,
+      endTimestamp: startTimestamp,
       data: [],
     };
   }
@@ -263,24 +255,6 @@ export default function Home() {
                 placeholder="e.g. Organic Chem"
                 className={`${selectClass} w-full`}
               />
-            </div>
-
-            <div className="flex flex-col gap-0.5">
-              <label className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
-                Duration
-              </label>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value.replace(/\D/g, ""))}
-                  placeholder="50"
-                  className={`${selectClass} w-full`}
-                />
-                <span className="text-xs text-gray-400 shrink-0">min</span>
-              </div>
             </div>
 
             <div className="flex flex-col gap-0.5">
