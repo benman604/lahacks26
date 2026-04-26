@@ -143,7 +143,7 @@ export default function SessionWindow() {
       const dataUrl = c.toDataURL("image/png");
 
       // send to server
-      const res = await fetch("/api/image", {
+      const res = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dataUrl }),
