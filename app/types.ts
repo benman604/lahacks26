@@ -4,26 +4,26 @@
 // 3. When the session ends the raw RawSessionData is processed to create a SessionData object. The main difference is that instead of having raw screenshot data, we have focusElements and appElements. focusElements are contiguous periods of time where the user is in the same focus type. For appElements, the AI is first asked to come up with categories of apps that are roughly the same activity and then making contiguous periods of time where the user is in the same category of app/website. idleTimeSeconds is the total time during the session where the user is idle. The start and end timestamps of the session are also included in SessionData for easy access.
 // 4. When the user is viewing their session summary card, the SessionData is processed to create a SessionSummary.
 
-type FocusElement = {
+export type FocusElement = {
 	startTimestamp: Date;
 	endTimestamp: Date;
 	focusType: "focus" | "distracted" | "break";
 }
 
-type AppElement = {
+export type AppElement = {
 	startTimestamp: Date;
 	endTimestamp: Date;
 	activityName: string;
 }
 
-type ScreenshotData = {
+export type ScreenshotData = {
 	timestamp: Date;
 	focusType: "focus" | "distracted" | "break";
 	websiteOrApp: string;
 	isIdle: boolean;
 }
 
-type RawSessionData = {
+export type RawSessionData = {
 	title: string;
 	idealBreakTimeMinutes: number;
 	startTimestamp: Date;
@@ -31,9 +31,10 @@ type RawSessionData = {
 	data: ScreenshotData[];
 }
 
-type SessionData = {
+export type SessionData = {
 	userId: string;
 	title: string;
+	idealBreakTimeMinutes: number;
 	startTimestamp: Date;
 	endTimestamp: Date;
 	focusElements: FocusElement[];
@@ -43,7 +44,7 @@ type SessionData = {
 
 // Define a function Adherence(average, ideal) that outputs a score from 0-100 based on the formula above
 
-type SessionSummary = {
+export type SessionSummary = {
 	username: string;
 	title: string;
 	startTimestamp: Date;
