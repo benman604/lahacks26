@@ -1,16 +1,53 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import { ScreenshotData } from "@/app/types";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { RawSessionData, ScreenshotData } from "@/app/types";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { availableMonitors, LogicalPosition, LogicalSize, currentMonitor } from "@tauri-apps/api/window";
-import { listen } from "@tauri-apps/api/event";
+import {
+  availableMonitors,
+  type Monitor,
+  LogicalPosition,
+  LogicalSize,
+  currentMonitor,
+} from "@tauri-apps/api/window";
+import { emit, listen } from "@tauri-apps/api/event";
 
 const blockerLabels: string[] = [];
 const MAX_CONTEXT_SIZE = 5;
 const ANALYSIS_INTERVAL_MS = 20 * 1000; // analyze every 40 seconds
 
+type RawSessionDataWire = {
+  title?: unknown;
+  subject?: unknown;
+  plannedDurationMinutes?: unknown;
+  idealBreakTimeMinutes?: unknown;
+  startTimestamp?: unknown;
+  endTimestamp?: unknown;
+  data?: unknown;
+};
+
+function toPositiveNumber(value: unknown, fallback: number) {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === "string") {
+    const n = Number.parseFloat(value);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return fallback;
+}
+
+function toDate(value: unknown, fallback: Date) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value === "string" || typeof value === "number") {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return fallback;
+}
+
 export default function SessionWindow() {
+  const [rawSessionData, setRawSessionData] = useState<RawSessionData | null>(null);
+  const [recordingError, setRecordingError] = useState<string>("");
+
   const [secondsLeft, setSecondsLeft] = useState<number>(0);
   const [running, setRunning] = useState(false);
   const timerRef = useRef<number | null>(null);
@@ -23,8 +60,16 @@ export default function SessionWindow() {
 
   async function enableRecording() {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const s = await (navigator.mediaDevices as any).getDisplayMedia({ video: { cursor: "always" } });
+      setRecordingError("");
+      const getDisplayMedia = navigator.mediaDevices?.getDisplayMedia?.bind(navigator.mediaDevices);
+      if (!getDisplayMedia) {
+        setRecordingError(
+          "Screen recording is not supported in this environment (navigator.mediaDevices.getDisplayMedia unavailable)."
+        );
+        return;
+      }
+
+      const s = await getDisplayMedia({ video: { cursor: "always" } } as DisplayMediaStreamOptions);
       streamRef.current = s as MediaStream;
       const v = document.createElement("video");
       v.style.display = "none";
@@ -39,13 +84,13 @@ export default function SessionWindow() {
       await v.play();
       setRecordingEnabled(true);
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error("failed to enable recording", e);
+      setRecordingError("Failed to enable screen recording. Check browser/OS permissions and try again.");
     }
 
   }
 
-  const [history, setHistory] = useState<ScreenshotData[]>([]);
+  const [, setHistory] = useState<ScreenshotData[]>([]);
   const historyRef = useRef<ScreenshotData[]>([]);
 
 	function appendHistory(entry: ScreenshotData) {
@@ -56,9 +101,38 @@ export default function SessionWindow() {
 		});
 	}
 
-  async function analyzeCurrentScreenshot() {
+  useEffect(() => {
+    const unlistenPromise = listen<RawSessionDataWire>("session-data", (event) => {
+      const incoming = event.payload;
+      if (!incoming) return;
+
+      const now = new Date();
+      const plannedDurationMinutes = toPositiveNumber(incoming.plannedDurationMinutes, 50);
+      const startTimestamp = toDate(incoming.startTimestamp, now);
+      const endFallback = new Date(startTimestamp.getTime() + plannedDurationMinutes * 60_000);
+      const endTimestamp = toDate(incoming.endTimestamp, endFallback);
+
+      setRawSessionData({
+        title: typeof incoming.title === "string" ? incoming.title : "Session",
+        subject: typeof incoming.subject === "string" ? incoming.subject : "",
+        plannedDurationMinutes,
+        idealBreakTimeMinutes: toPositiveNumber(incoming.idealBreakTimeMinutes, 10),
+        startTimestamp,
+        endTimestamp,
+        data: Array.isArray(incoming.data) ? (incoming.data as ScreenshotData[]) : [],
+      });
+    });
+
+    // let the homepage know we're mounted and ready to receive session data
+    emit("session-window-ready").catch(() => {});
+
+    return () => {
+      unlistenPromise.then((un) => un()).catch(() => {});
+    };
+  }, []);
+
+  const analyzeCurrentScreenshot = useCallback(async () => {
     try {
-			console.log("history:", history);
       // ensure recording active and video present
       if (!streamRef.current || !videoRef.current) throw new Error("Recording not enabled");
       if (!canvasRef.current) canvasRef.current = document.createElement("canvas");
@@ -70,18 +144,16 @@ export default function SessionWindow() {
       if (!ctx) throw new Error("no canvas context");
       ctx.drawImage(v, 0, 0, c.width, c.height);
       const dataUrl = c.toDataURL("image/png");
-			console.log("screenshot taken, analyzing with Gemini...", { dataUrl, history });
 
       const toSend = historyRef.current.slice(-MAX_CONTEXT_SIZE);
       const res = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl, history: toSend }),
+        body: JSON.stringify({ dataUrl, history: toSend, subject: rawSessionData?.subject ?? "" }),
       });
 
       const data = await res.json();
       if (!res.ok || data.error) {
-        // eslint-disable-next-line no-console
         console.error("gemini analyze failed", data);
         return;
       }
@@ -95,10 +167,9 @@ export default function SessionWindow() {
       };
       appendHistory(entry);
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error("analyzeCurrentScreenshot failed", e);
     }
-  }
+  }, [rawSessionData?.subject]);
 
   useEffect(() => {
     const unlistenTrigger = listen("trigger-blockers", async () => {
@@ -134,13 +205,13 @@ export default function SessionWindow() {
 		return () => {
 			window.clearInterval(intervalId);
 		}
-	}, [recordingEnabled]);
+  }, [recordingEnabled, analyzeCurrentScreenshot]);
 
   async function openBlockers() {
-    let monitors = [] as any[];
+    let monitors: Monitor[] = [];
     try {
       monitors = await availableMonitors();
-    } catch (e) {
+    } catch {
       const m = await currentMonitor();
       if (m) monitors = [m];
     }
@@ -170,13 +241,11 @@ export default function SessionWindow() {
           await blocker.setPosition(new LogicalPosition(pos.x / scale, pos.y / scale));
           await blocker.setSize(new LogicalSize(m.size.width / scale, m.size.height / scale));
         } catch (e) {
-          // eslint-disable-next-line no-console
           console.error("failed to size blocker", e);
         }
       });
 
       blocker.once("tauri://error", (e) => {
-        // eslint-disable-next-line no-console
         console.error("failed to create blocker", e);
       });
 
@@ -191,7 +260,6 @@ export default function SessionWindow() {
         try {
           await w.close();
         } catch (e) {
-          // eslint-disable-next-line no-console
           console.error("failed to close blocker", label, e);
         }
       }
@@ -236,6 +304,9 @@ export default function SessionWindow() {
 			{(!recordingEnabled || !streamRef.current) && (
 				<div>
 					<h2>Please enable screen recording on all screens to start your session</h2>
+          {recordingError && (
+            <p className="mt-2 text-sm text-red-600">{recordingError}</p>
+          )}
 					<button
 						onClick={enableRecording}
 						className="px-3 py-1 rounded bg-purple-600 text-white hover:bg-purple-700"

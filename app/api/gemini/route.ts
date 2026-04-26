@@ -19,7 +19,7 @@ const ScreenshotDataSchema = z.object({
 const structuredModel = model.withStructuredOutput(ScreenshotDataSchema);
 
 const PROMPT =
-  "Analyze this screenshot. Identify the website or app visible. Determine if the user appears focused, distracted, or on a break. Then describe what you see on the screen in depth/what the user seems to be doing";
+  "Analyze this screenshot. Identify the website or app visible. Determine if the user appears focused, distracted, or on a break. Then describe what you see on the screen in depth/what the user seems to be doing.";
 
 const HistoryItemSchema = z.object({
   // timestamp optional for compatibility
@@ -39,7 +39,16 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { dataUrl, history = [] } = body as { dataUrl?: string; history?: unknown };
+  const { dataUrl, history = [], subject } = body as {
+    dataUrl?: string;
+    history?: unknown;
+    subject?: unknown;
+  };
+
+  const subjectText = typeof subject === "string" ? subject.trim() : "";
+  const promptWithSubject = subjectText
+    ? `${PROMPT} Make sure the user is working on ${subjectText}.`
+    : PROMPT;
 
   console.log("Received data for Gemini analysis", { dataUrl: !!dataUrl, history: history });
   // attempt to validate history; if validation fails, log the error and fall back to raw array if possible
@@ -55,7 +64,7 @@ export async function POST(req: Request) {
 
   // Build messages: prompt, then prior history summaries, then current image
   const content: any[] = [];
-  content.push({ type: "text", text: PROMPT });
+  content.push({ type: "text", text: promptWithSubject });
 
   for (const h of historyItems) {
     const when = h.timestamp ? `at ${h.timestamp}` : "previous";

@@ -2,8 +2,18 @@
 
 import { useState } from "react";
 
+export type FeedPost = {
+  id: number;
+  initials: string;
+  color: string;
+  name: string;
+  date: string;
+  title: string;
+  kudos: number;
+  comments: { initials: string; color: string; name: string; text: string }[];
+};
 
-const posts = [
+const defaultPosts: FeedPost[] = [
   {
     id: 1,
     initials: "B",
@@ -41,87 +51,30 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
 }
 
 export default function FeedSection({
-  openSession,
+  posts = defaultPosts,
+  highlightedPostId,
+  onHighlightPostId,
 }: {
-  openSession: () => void;
+  posts?: FeedPost[];
+  highlightedPostId: number | null;
+  onHighlightPostId: (postId: number) => void;
 }) {
-  const [subject, setSubject] = useState("Organic Chem");
-  const [duration, setDuration] = useState("50");
-  const [breakTime, setBreakTime] = useState("10");
   const [commentDraft, setCommentDraft] = useState("");
-
-  const selectClass =
-    "text-sm border border-gray-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-orange-400";
+  const basePostClassName =
+    "bg-white border border-gray-200 rounded-xl px-5 py-4 flex flex-col gap-3 cursor-pointer transition-colors hover:bg-gray-50";
 
   return (
-    <main className="flex-1 flex flex-col gap-4 min-w-0">
-      {/* Start lock-in bar */}
-      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-col gap-3">
-        <div className="flex gap-3 items-end">
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
-            Subject
-          </label>
-          <input
-            type="text"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            placeholder="e.g. Organic Chem"
-            className={`${selectClass} w-full`}
-          />
-        </div>
-
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
-            Duration
-          </label>
-          <div className="flex items-center gap-1">
-            <input
-              type="number"
-              min="1"
-              step="1"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value.replace(/\D/g, ""))}
-              placeholder="50"
-              className={`${selectClass} w-full`}
-            />
-            <span className="text-xs text-gray-400 shrink-0">min</span>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
-            Break time
-          </label>
-          <div className="flex items-center gap-1">
-            <input
-              type="number"
-              min="1"
-              step="1"
-              value={breakTime}
-              onChange={(e) => setBreakTime(e.target.value.replace(/\D/g, ""))}
-              placeholder="10"
-              className={`${selectClass} w-full`}
-            />
-            <span className="text-xs text-gray-400 shrink-0">min</span>
-          </div>
-        </div>
-        </div>
-
-        <button
-          onClick={openSession}
-          className="col-span-2 py-2 rounded-lg text-white text-sm font-semibold hover:opacity-90 transition-opacity"
-          style={{ backgroundColor: "var(--p2p-accent)" }}
-        >
-          Start lock-in
-        </button>
-      </div>
-
-      {/* Feed posts */}
+    <>
       {posts.map((post) => (
         <article
           key={post.id}
-          className="bg-white border border-gray-200 rounded-xl px-5 py-4 flex flex-col gap-3"
+          onClick={() => onHighlightPostId(post.id)}
+          className={
+            post.id === highlightedPostId
+              ? "bg-white border-2 rounded-xl px-5 py-4 flex flex-col gap-3 cursor-pointer"
+              : basePostClassName
+          }
+          style={post.id === highlightedPostId ? { borderColor: "var(--p2p-accent)" } : {}}
         >
           <div className="flex items-start gap-3">
             <Avatar initials={post.initials} color={post.color} />
@@ -193,6 +146,6 @@ export default function FeedSection({
           )}
         </article>
       ))}
-    </main>
+    </>
   );
 }
