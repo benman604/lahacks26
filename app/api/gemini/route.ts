@@ -10,9 +10,9 @@ const model = new ChatGoogleGenerativeAI({
 
 const ScreenshotDataSchema = z.object({
   //timestamp: z.date(),
-  focusType: z.enum(["focus", "distracted", "break"]),
-  websiteOrApp: z.string(),
-  isIdle: z.boolean(),
+  focusType: z.enum(["focus", "distracted", "break"]).describe("Whether the user appears focused, distracted, or on a break"),
+  websiteOrApp: z.string().describe("The primary website or app currently visible. If on browser, identify the main website (e.g. 'YouTube', 'Reddit', 'Google Docs'). If on desktop, identify the primary application (e.g. 'Slack', 'VS Code', 'Finder')"),
+  isIdle: z.boolean().describe("Whether the user is idle"),
   description: z.string().describe("Description of what is on screen"),
 });
 
