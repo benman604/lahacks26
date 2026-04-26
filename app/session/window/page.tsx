@@ -178,6 +178,10 @@ export default function SessionWindow() {
         description: data.description,
       };
       appendHistory(entry);
+
+      if (data.focusType === "distracted") {
+        await openBlockers();
+      }
     } catch (e) {
       console.error("analyzeCurrentScreenshot failed", e);
     }
