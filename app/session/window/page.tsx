@@ -361,6 +361,38 @@ export default function SessionWindow() {
     return `${m}:${s}`;
   }
 
+  async function endSession() {
+    if (!rawSessionData) return;
+
+    const sessionEndPayload: RawSessionData = {
+      ...rawSessionData,
+      data: historyRef.current.slice(),
+    };
+
+    await emit("SessionEnd", sessionEndPayload);
+
+    stopTimer();
+    if (breakTimerRef.current) {
+      clearInterval(breakTimerRef.current);
+      breakTimerRef.current = null;
+    }
+    if (breakCooldownRef.current) {
+      clearInterval(breakCooldownRef.current);
+      breakCooldownRef.current = null;
+    }
+    await closeBlockers();
+
+    const homepage = await WebviewWindow.getByLabel("main");
+    if (homepage) {
+      await homepage.setFocus();
+    }
+
+    const sessionWindow = await WebviewWindow.getByLabel("session-window");
+    if (sessionWindow) {
+      await sessionWindow.close();
+    }
+  }
+
   return (
     <div className="p-4 w-full h-full flex flex-col gap-4 items-center justify-center">
       
@@ -382,7 +414,7 @@ export default function SessionWindow() {
 			{(recordingEnabled || streamRef.current) && (
 				<div>
 					<div className="flex flex-col items-center">
-						<h2 className="text-lg font-semibold">Session Controller</h2>
+						<h2 className="text-lg font-semibold">{rawSessionData?.title || "Session Controller"}</h2>
 					<div className="mt-2 text-2xl">{onBreak ? formatTime(Math.abs(breakSecondsLeft)) : formatTime(secondsLeft)}</div>
 					{onBreak && breakSecondsLeft < 0 && (
 						<div className="mt-1 text-sm text-orange-600">Overtime: {formatTime(Math.abs(breakSecondsLeft))}</div>
@@ -408,6 +440,11 @@ export default function SessionWindow() {
 									End break
 								</button>
 							)}
+
+              <button onClick={endSession} className="px-3 py-1 rounded bg-gray-600 text-white">
+                End Session
+              </button>
+
 							{/* <button
 								onClick={enableRecording}
 								disabled={recordingEnabled}
@@ -421,25 +458,16 @@ export default function SessionWindow() {
 							</button> */}
 						</div>
 					</div>
-            <div className="flex gap-2">
-                    <button
-                      onClick={() => openBlockers()}
-                      className="px-3 py-1 rounded bg-red-600 text-white"
-                    >
-                      Test Blocking
-                    </button>
-                    <button onClick={analyzeCurrentScreenshot} className="px-3 py-1 rounded bg-blue-700 text-white">
-                      Test Screenshot
-                    </button>
-						<button
-							onClick={() => {
-								stopTimer();
-								closeBlockers();
-							}}
-							className="px-3 py-1 rounded bg-gray-700 text-white"
-						>
-							Stop Session
-						</button>
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => openBlockers()}
+              className="px-3 py-1 rounded bg-red-600 text-white"
+            >
+              Test Blocking
+            </button>
+            <button onClick={analyzeCurrentScreenshot} className="px-3 py-1 rounded bg-blue-700 text-white">
+              Test Screenshot
+            </button>
 					</div>
 				</div>
 			)}

@@ -6,6 +6,7 @@ import { currentMonitor, LogicalPosition, LogicalSize } from "@tauri-apps/api/wi
 import { listen } from "@tauri-apps/api/event";
 import LeftSidebar from "./components/LeftSidebar";
 import FeedSection, { type FeedPost } from "./components/FeedSection";
+import SessionSummary from "./components/SessionSummary";
 import RightSidebar from "./components/RightSidebar";
 import { type RawSessionData } from "./types";
 
@@ -46,8 +47,79 @@ function parsePositiveInt(value: string, fallback: number) {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+type ScreenshotDataWire = {
+  timestamp?: unknown;
+  focusType?: unknown;
+  websiteOrApp?: unknown;
+  isIdle?: unknown;
+};
+
+type RawSessionDataWire = {
+  title?: unknown;
+  subject?: unknown;
+  plannedDurationMinutes?: unknown;
+  idealBreakTimeMinutes?: unknown;
+  startTimestamp?: unknown;
+  endTimestamp?: unknown;
+  data?: unknown;
+};
+
+function toDate(value: unknown, fallback: Date) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value === "string" || typeof value === "number") {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return fallback;
+}
+
+function toPositiveNumber(value: unknown, fallback: number) {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === "string") {
+    const n = Number.parseFloat(value);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return fallback;
+}
+
+function normalizeRawSessionData(payload: RawSessionDataWire): RawSessionData {
+  const now = new Date();
+  const plannedDurationMinutes = toPositiveNumber(payload.plannedDurationMinutes, 50);
+  const startTimestamp = toDate(payload.startTimestamp, now);
+  const endFallback = new Date(startTimestamp.getTime() + plannedDurationMinutes * 60_000);
+  const endTimestamp = toDate(payload.endTimestamp, endFallback);
+
+  const data: RawSessionData["data"] = Array.isArray(payload.data)
+    ? payload.data.map((entry) => {
+        const wire = entry as ScreenshotDataWire;
+        const focusType: RawSessionData["data"][number]["focusType"] =
+          wire.focusType === "focus" || wire.focusType === "distracted" || wire.focusType === "break"
+            ? wire.focusType
+            : "focus";
+
+        return {
+          timestamp: toDate(wire.timestamp, now),
+          focusType,
+          websiteOrApp: typeof wire.websiteOrApp === "string" ? wire.websiteOrApp : "unknown",
+          isIdle: Boolean(wire.isIdle),
+        };
+      })
+    : [];
+
+  return {
+    title: typeof payload.title === "string" ? payload.title : "Session",
+    subject: typeof payload.subject === "string" ? payload.subject : "",
+    plannedDurationMinutes,
+    idealBreakTimeMinutes: toPositiveNumber(payload.idealBreakTimeMinutes, 10),
+    startTimestamp,
+    endTimestamp,
+    data,
+  };
+}
+
 export default function Home() {
   const latestRawSessionDataRef = React.useRef<RawSessionData | null>(null);
+  const [sessionSummaryData, setSessionSummaryData] = React.useState<RawSessionData | null>(null);
 
   React.useEffect(() => {
     const unlistenPromise = listen("session-window-ready", async () => {
@@ -63,8 +135,13 @@ export default function Home() {
       }
     });
 
+    const unlistenSessionEndPromise = listen<RawSessionDataWire>("SessionEnd", (event) => {
+      setSessionSummaryData(normalizeRawSessionData(event.payload));
+    });
+
     return () => {
       unlistenPromise.then((un) => un()).catch(() => {});
+      unlistenSessionEndPromise.then((un) => un()).catch(() => {});
     };
   }, []);
 
@@ -141,6 +218,15 @@ export default function Home() {
         console.error("failed to position session window", e);
       }
     });
+  }
+
+  if (sessionSummaryData) {
+    return (
+      <SessionSummary
+        session={sessionSummaryData}
+        onNext={() => setSessionSummaryData(null)}
+      />
+    );
   }
 
   const selectClass =

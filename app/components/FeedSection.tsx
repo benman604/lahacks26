@@ -5,6 +5,24 @@ import { useState } from "react";
 import SessionSummaryCard from "./SessionSummaryCard";
 import type { SessionData } from "../types";
 
+export type FeedComment = {
+  initials: string;
+  color: string;
+  name: string;
+  text: string;
+};
+
+export type FeedPost = {
+  id: number;
+  initials: string;
+  color: string;
+  name: string;
+  date: string;
+  title: string;
+  kudos: number;
+  comments: FeedComment[];
+};
+
 const sessions: SessionData[] = [
   {
     userId: "ben",
@@ -204,6 +222,8 @@ const sessions: SessionData[] = [
   },
 ];
 
+const defaultPosts: FeedPost[] = [];
+
 export default function FeedSection({
   posts = defaultPosts,
   highlightedPostId,
@@ -239,6 +259,6 @@ export default function FeedSection({
           }
         />
       ))}
-    </>
+    </main>
   );
 }
