@@ -56,11 +56,12 @@ export default function SessionWindow() {
   // break timer state
   const [onBreak, setOnBreak] = useState(false);
   const [breakSecondsLeft, setBreakSecondsLeft] = useState<number>(0);
-  const [breakOvertime, setBreakOvertime] = useState<number>(0);
-  const [breakCooldownLeft, setBreakCooldownLeft] = useState<number>(0);
-  const [inBreakCooldown, setInBreakCooldown] = useState(false);
   const breakTimerRef = useRef<number | null>(null);
-  const breakCooldownRef = useRef<number | null>(null);
+  const breakInitializedRef = useRef(false);
+
+  // stable refs so static event handlers always call the latest version
+  const rawSessionDataRef = useRef<RawSessionData | null>(null);
+  const analyzeCurrentScreenshotRef = useRef<() => Promise<void>>(async () => {});
 
   // screenshot helpers
   const streamRef = useRef<MediaStream | null>(null);
@@ -191,6 +192,18 @@ export default function SessionWindow() {
     }
   }, [rawSessionData?.subject, onBreak]);
 
+  // keep refs in sync so static event handlers always have the latest values
+  useEffect(() => { rawSessionDataRef.current = rawSessionData; }, [rawSessionData]);
+  useEffect(() => { analyzeCurrentScreenshotRef.current = analyzeCurrentScreenshot; }, [analyzeCurrentScreenshot]);
+
+  // initialize break budget once when session data first arrives
+  useEffect(() => {
+    if (rawSessionData && !breakInitializedRef.current) {
+      setBreakSecondsLeft(rawSessionData.idealBreakTimeMinutes * 60);
+      breakInitializedRef.current = true;
+    }
+  }, [rawSessionData]);
+
   useEffect(() => {
     const unlistenTrigger = listen("trigger-blockers", async () => {
       await openBlockers();
@@ -200,14 +213,30 @@ export default function SessionWindow() {
       await closeBlockers();
     });
 
+    const unlistenAllowBreak = listen("allow-break", async () => {
+      await closeBlockers();
+      stopTimer();
+      setOnBreak(true);
+      if (breakTimerRef.current) clearInterval(breakTimerRef.current);
+      breakTimerRef.current = window.setInterval(() => {
+        setBreakSecondsLeft((s) => s - 1);
+      }, 1000);
+    });
+
+    const unlistenDismissRetry = listen("dismiss-blockers-retry", async () => {
+      await closeBlockers();
+      setTimeout(() => { analyzeCurrentScreenshotRef.current(); }, 5000);
+    });
+
     startTimer();
 
     return () => {
       unlistenTrigger.then((un) => un()).catch(() => {});
       unlistenClose.then((un) => un()).catch(() => {});
+      unlistenAllowBreak.then((un) => un()).catch(() => {});
+      unlistenDismissRetry.then((un) => un()).catch(() => {});
       stopTimer();
       if (breakTimerRef.current) clearInterval(breakTimerRef.current);
-      if (breakCooldownRef.current) clearInterval(breakCooldownRef.current);
       closeBlockers();
     };
   }, []);
@@ -308,52 +337,21 @@ export default function SessionWindow() {
   }
 
   function startBreak() {
-    if (!rawSessionData) return;
-    // pause the main timer
     stopTimer();
-    // set break state
     setOnBreak(true);
-    const breakDuration = rawSessionData.idealBreakTimeMinutes * 60;
-    setBreakSecondsLeft(breakDuration);
-    // start break timer countdown (can go negative)
+    if (breakTimerRef.current) clearInterval(breakTimerRef.current);
     breakTimerRef.current = window.setInterval(() => {
       setBreakSecondsLeft((s) => s - 1);
     }, 1000);
   }
 
   function endBreak() {
-    if (!rawSessionData) return;
-    // clear break timer
     if (breakTimerRef.current) {
       clearInterval(breakTimerRef.current);
       breakTimerRef.current = null;
     }
-    // accumulate any overtime (negative seconds)
-    if (breakSecondsLeft < 0) {
-      setBreakOvertime((prev) => prev + Math.abs(breakSecondsLeft));
-    }
-    // reset break state
     setOnBreak(false);
-    setBreakSecondsLeft(0);
-    // start cooldown
-    const breakCooldown = rawSessionData.idealBreakTimeMinutes * 60;
-    setInBreakCooldown(true);
-    setBreakCooldownLeft(breakCooldown);
-    breakCooldownRef.current = window.setInterval(() => {
-      setBreakCooldownLeft((s) => {
-        const newSeconds = s - 1;
-        if (newSeconds <= 0) {
-          if (breakCooldownRef.current) {
-            clearInterval(breakCooldownRef.current);
-            breakCooldownRef.current = null;
-          }
-          setInBreakCooldown(false);
-          return 0;
-        }
-        return newSeconds;
-      });
-    }, 1000);
-    // resume main timer
+    // breakSecondsLeft is intentionally NOT reset — preserves remaining balance
     startTimer();
   }
 
@@ -381,10 +379,6 @@ export default function SessionWindow() {
     if (breakTimerRef.current) {
       clearInterval(breakTimerRef.current);
       breakTimerRef.current = null;
-    }
-    if (breakCooldownRef.current) {
-      clearInterval(breakCooldownRef.current);
-      breakCooldownRef.current = null;
     }
     await closeBlockers();
 
@@ -421,30 +415,28 @@ export default function SessionWindow() {
 				<div>
 					<div className="flex flex-col items-center">
 						<h2 className="text-lg font-semibold">{rawSessionData?.title || "Session Controller"}</h2>
-					<div className="mt-2 text-2xl">{onBreak ? formatTime(Math.abs(breakSecondsLeft)) : formatTime(secondsLeft)}</div>
+					<div className="mt-2 text-2xl">{onBreak ? formatTime(Math.max(breakSecondsLeft, 0)) : formatTime(secondsLeft)}</div>
 					{onBreak && breakSecondsLeft < 0 && (
-						<div className="mt-1 text-sm text-orange-600">Overtime: {formatTime(Math.abs(breakSecondsLeft))}</div>
+						<div className="mt-1 text-sm text-orange-600">Break time exceeded by {formatTime(Math.abs(breakSecondsLeft))}</div>
 					)}
-					{inBreakCooldown && (
-						<div className="mt-1 text-sm text-yellow-600">Cooldown: {formatTime(breakCooldownLeft)}</div>
-					)}
-					{breakOvertime > 0 && (
-						<div className="mt-1 text-sm text-gray-600">Break overtime: {formatTime(breakOvertime)}</div>
+					{!onBreak && (
+						<div className="mt-1 text-xs text-gray-500">Break remaining: {formatTime(Math.max(breakSecondsLeft, 0))}</div>
 					)}
 					<div className="mt-2 flex gap-2 items-center">
 						{!onBreak && (
-							<button onClick={startBreak} disabled={inBreakCooldown} className={`px-3 py-1 rounded ${
-								inBreakCooldown
-									? "bg-gray-400 text-white cursor-not-allowed"
-									: "bg-blue-600 text-white hover:bg-blue-700"
-							}`}>
-									Take a break
-								</button>
-							)}
+							<button onClick={startBreak} className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">
+								Take a break
+							</button>
+						)}
 							{onBreak && (
-								<button onClick={endBreak} className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700">
-									End break
-								</button>
+								<>
+									<button onClick={endBreak} className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700">
+										End break
+									</button>
+									<button onClick={() => { endBreak(); openBlockers(); }} className="px-3 py-1 rounded bg-red-500 text-white hover:bg-red-600">
+										Re-block
+									</button>
+								</>
 							)}
 
               <button onClick={endSession} className="px-3 py-1 rounded bg-gray-600 text-white">
