@@ -1,9 +1,25 @@
 "use client";
 
-import { useState } from "react";
-
 import SessionSummaryCard from "./SessionSummaryCard";
 import type { SessionData } from "../types";
+
+export type FeedComment = {
+  initials: string;
+  color: string;
+  name: string;
+  text: string;
+};
+
+export type FeedPost = {
+  id: number;
+  initials: string;
+  color: string;
+  name: string;
+  date: string;
+  title: string;
+  kudos: number;
+  comments: FeedComment[];
+};
 
 const sessions: SessionData[] = [
   {
@@ -231,81 +247,22 @@ const sessions: SessionData[] = [
   },
 ];
 
-export default function FeedSection({
-  openBlockers,
-}: {
-  openBlockers: () => void;
-}) {
-  const [subject, setSubject] = useState("Organic Chem");
-  const [duration, setDuration] = useState("50");
-  const [breakTime, setBreakTime] = useState("10");
+const defaultPosts: FeedPost[] = [];
 
+export default function FeedSection({
+  posts = defaultPosts,
+  highlightedPostId,
+  onHighlightPostId,
+}: {
+  posts?: FeedPost[];
+  highlightedPostId: number | null;
+  onHighlightPostId: (postId: number) => void;
+}) {
   const selectClass =
     "text-sm border border-gray-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-orange-400";
 
   return (
     <main className="flex-1 flex flex-col gap-4 min-w-0">
-      {/* Start lock-in bar */}
-      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-col gap-3">
-        <div className="flex gap-3 items-end">
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
-            Subject
-          </label>
-          <input
-            type="text"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            placeholder="e.g. Organic Chem"
-            className={`${selectClass} w-full`}
-          />
-        </div>
-
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
-            Duration
-          </label>
-          <div className="flex items-center gap-1">
-            <input
-              type="number"
-              min="1"
-              step="1"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value.replace(/\D/g, ""))}
-              placeholder="50"
-              className={`${selectClass} w-full`}
-            />
-            <span className="text-xs text-gray-400 shrink-0">min</span>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
-            Break time
-          </label>
-          <div className="flex items-center gap-1">
-            <input
-              type="number"
-              min="1"
-              step="1"
-              value={breakTime}
-              onChange={(e) => setBreakTime(e.target.value.replace(/\D/g, ""))}
-              placeholder="10"
-              className={`${selectClass} w-full`}
-            />
-            <span className="text-xs text-gray-400 shrink-0">min</span>
-          </div>
-        </div>
-        </div>
-
-        <button
-          onClick={openBlockers}
-          className="w-full py-2 rounded-lg text-white text-sm font-semibold hover:opacity-90 transition-opacity"
-          style={{ backgroundColor: "var(--p2p-accent)" }}
-        >
-          Start lock-in
-        </button>
-      </div>
 
       {/* Feed posts */}
       {sessions.map((session) => (
