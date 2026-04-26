@@ -1,8 +1,31 @@
 "use client";
 
-import { emit } from "@tauri-apps/api/event";
+import { useEffect, useState } from "react";
+import { emit, listen } from "@tauri-apps/api/event";
+
+type DistractionInstructionPayload = {
+  instruction?: unknown;
+};
 
 export default function GPTW() {
+  const [instruction, setInstruction] = useState<string>("");
+
+  useEffect(() => {
+    const unlistenPromise = listen<DistractionInstructionPayload>(
+      "show-distraction-instruction",
+      (event) => {
+        const nextInstruction = event.payload?.instruction;
+        if (typeof nextInstruction === "string") {
+          setInstruction(nextInstruction);
+        }
+      }
+    );
+
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten()).catch(() => {});
+    };
+  }, []);
+
   async function close() {
     try {
       await emit("close-blockers");
@@ -19,6 +42,12 @@ export default function GPTW() {
         <h1 className="text-5xl font-bold ">
           Hey!
         </h1>
+
+        {instruction && (
+          <p className="max-w-2xl text-center text-base text-white/95">
+            {instruction}
+          </p>
+        )}
 
         <h3 className="text-lg ">
           Get back to work bud.

@@ -14,6 +14,7 @@ const ScreenshotDataSchema = z.object({
   websiteOrApp: z.string().describe("The website or app currently visible that takes up a majority of the screen. If on browser, identify the main website (e.g. 'YouTube', 'Reddit', 'Google Docs'). If on desktop, identify the primary application (e.g. 'Slack', 'VS Code', 'Finder')"),
   isIdle: z.boolean().describe("Whether the user is idle"),
   description: z.string().describe("Description of what is on screen"),
+  instructOffDistraction: z.string().describe("Instruction to the user to get back on track if they are distracted, for example, 'Get off reels, and back to {subject}!'. Only populate if focus is distracted.").optional(),
 });
 
 const structuredModel = model.withStructuredOutput(ScreenshotDataSchema);

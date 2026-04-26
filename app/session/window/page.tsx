@@ -177,10 +177,14 @@ export default function SessionWindow() {
         isIdle: data.isIdle,
         description: data.description,
       };
+
       appendHistory(entry);
 
       if (data.focusType === "distracted") {
         await openBlockers();
+        if (data.instructOffDistraction) {
+          await emit("show-distraction-instruction", { instruction: data.instructOffDistraction });
+        }
       }
     } catch (e) {
       console.error("analyzeCurrentScreenshot failed", e);
