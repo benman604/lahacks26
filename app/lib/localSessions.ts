@@ -59,7 +59,8 @@ type RawSessionData = {
     productivityRate: number;
     distractionRecoveryTime: number;
     adherenceToBreakTime: number;
-    chaosScore: number;
+    flowScore?: number;
+    chaosScore?: number;
     idleRatio: number;
   };
   timelineSummary?: {
@@ -184,6 +185,19 @@ function hydrateSession(raw: RawSessionData): SessionData {
       }
     : undefined;
 
+  const summaryMetrics = raw.summaryMetrics
+    ? {
+        productivityRate: raw.summaryMetrics.productivityRate,
+        distractionRecoveryTime: raw.summaryMetrics.distractionRecoveryTime,
+        adherenceToBreakTime: raw.summaryMetrics.adherenceToBreakTime,
+        flowScore:
+          typeof raw.summaryMetrics.flowScore === "number"
+            ? raw.summaryMetrics.flowScore
+            : 100 - (raw.summaryMetrics.chaosScore ?? 0),
+        idleRatio: raw.summaryMetrics.idleRatio,
+      }
+    : undefined;
+
   return {
     userId: raw.userId,
     title: raw.title,
@@ -193,7 +207,7 @@ function hydrateSession(raw: RawSessionData): SessionData {
     focusElements,
     appElements,
     idleTimeSeconds: raw.idleTimeSeconds,
-    summaryMetrics: raw.summaryMetrics,
+    summaryMetrics,
     timelineSummary,
   };
 }

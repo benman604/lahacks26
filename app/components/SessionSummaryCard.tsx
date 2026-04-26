@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import type { SessionData, SessionSummary } from "../types";
+import { calculateProductivityScore } from "../lib/sessionStats";
 
 type Props = {
   session: SessionData;
@@ -107,35 +108,31 @@ function computeAverageDurationMinutes<T extends { startTimestamp: Date; endTime
   return totalSeconds / elements.length / 60;
 }
 
-function computeChaosScore(appElements: SessionData["appElements"]) {
-  const totalSeconds = appElements.reduce(
-    (sum, el) => sum + secondsBetween(el.startTimestamp, el.endTimestamp),
+function calculateFlowScore(focusElements: SessionData["focusElements"], totalSessionTime: number) {
+  const MIN_DEEP_WORK_THRESHOLD = 5 * 60;
+  const MAX_ALLOWED_SWITCHES_PER_HOUR = 10;
+
+  if (totalSessionTime <= 0) return 0;
+
+  const deepBlocks = focusElements.filter((el) => {
+    if (el.focusType !== "focus") return false;
+    return secondsBetween(el.startTimestamp, el.endTimestamp) >= MIN_DEEP_WORK_THRESHOLD;
+  });
+
+  const deepDuration = deepBlocks.reduce(
+    (sum, block) => sum + secondsBetween(block.startTimestamp, block.endTimestamp),
     0
   );
+  const deepRatio = deepDuration / totalSessionTime;
 
-  if (totalSeconds <= 0) return 0;
+  const transitions = Math.max(0, focusElements.length - 1);
+  const maxAllowedSwitches = Math.max(
+    1,
+    Math.round((totalSessionTime / 3600) * MAX_ALLOWED_SWITCHES_PER_HOUR)
+  );
+  const transitionFactor = Math.max(0, 1 - transitions / maxAllowedSwitches);
 
-  const byActivity = new Map<string, number>();
-
-  for (const el of appElements) {
-    byActivity.set(
-      el.activityName,
-      (byActivity.get(el.activityName) ?? 0) +
-        secondsBetween(el.startTimestamp, el.endTimestamp)
-    );
-  }
-
-  const activityCount = byActivity.size;
-  if (activityCount <= 1) return 0;
-
-  const sumOfSquares = [...byActivity.values()].reduce((sum, seconds) => {
-    const p = seconds / totalSeconds;
-    return sum + p * p;
-  }, 0);
-
-  const simpsonDiversity = 1 - sumOfSquares;
-
-  return clampPercent(simpsonDiversity * 100);
+  return Math.round(clampPercent(deepRatio * transitionFactor * 100));
 }
 
 function computeSessionSummary(
@@ -143,6 +140,10 @@ function computeSessionSummary(
   username: string,
 ): SessionSummary {
   if (session.summaryMetrics) {
+    const persisted = session.summaryMetrics as typeof session.summaryMetrics & {
+      chaosScore?: number;
+    };
+
     return {
       username,
       title: session.title,
@@ -153,7 +154,10 @@ function computeSessionSummary(
       productivityRate: session.summaryMetrics.productivityRate,
       distractionRecoveryTime: session.summaryMetrics.distractionRecoveryTime,
       adherenceToBreakTime: session.summaryMetrics.adherenceToBreakTime,
-      chaosScore: session.summaryMetrics.chaosScore,
+      flowScore:
+        typeof persisted.flowScore === "number"
+          ? persisted.flowScore
+          : 100 - (persisted.chaosScore ?? 0),
       idleRatio: session.summaryMetrics.idleRatio,
     };
   }
@@ -186,7 +190,7 @@ function computeSessionSummary(
     distractionRecoveryTime: calculateDistractionScore(averageDistractionMinutes, 30) * 100,
     adherenceToBreakTime:
       adherence(averageBreakMinutes, session.idealBreakTimeMinutes) * 100,
-    chaosScore: computeChaosScore(session.appElements),
+    flowScore: calculateFlowScore(session.focusElements, totalSeconds),
     idleRatio: totalSeconds > 0 ? clampPercent((session.idleTimeSeconds / totalSeconds) * 100) : 0,
   };
 }
@@ -285,9 +289,9 @@ function RadarChart({ summary }: { summary: SessionSummary }) {
   const stats = [
     { label: "Focus", value: summary.productivityRate },
     { label: "Recovery", value: summary.distractionRecoveryTime },
-    { label: "Fixes", value: summary.adherenceToBreakTime },
-    { label: "Chaos", value: summary.chaosScore },
-    { label: "Ponder", value: 100 - summary.idleRatio },
+    { label: "Discipline", value: summary.adherenceToBreakTime },
+    { label: "Flow", value: summary.flowScore },
+    { label: "Activity", value: 100 - summary.idleRatio },
   ];
 
   const center = 110;
@@ -395,7 +399,13 @@ export default function SessionSummaryCard({
 }: Props) {
   const summary = computeSessionSummary(session, username);
   const sessionDateLabel = formatSessionDateLabel(summary.startTimestamp);
-  const roundedProductivity = Math.round(summary.productivityRate);
+  const roundedProductivity = calculateProductivityScore({
+    productivityRate: summary.productivityRate,
+    distractionRecoveryTime: summary.distractionRecoveryTime,
+    adherenceToBreakTime: summary.adherenceToBreakTime,
+    flowScore: summary.flowScore,
+    idleRatio: summary.idleRatio,
+  });
   const isFocusedRed = roundedProductivity <= 69;
   const isFocusedYellow = roundedProductivity >= 70 && roundedProductivity <= 89;
   const focusBadgeBackground = isFocusedRed
@@ -504,7 +514,7 @@ export default function SessionSummaryCard({
           className="rounded-full px-3 py-1 text-xs font-bold shrink-0"
           style={{ backgroundColor: focusBadgeBackground, color: focusBadgeText }}
         >
-          {roundedProductivity}% focused
+          {roundedProductivity}% productive
         </div>
       </div>
 
@@ -515,9 +525,9 @@ export default function SessionSummaryCard({
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <StatPill label="Focus" value={summary.productivityRate} />
             <StatPill label="Recovery" value={summary.distractionRecoveryTime} />
-            <StatPill label="Fixes" value={summary.adherenceToBreakTime} />
-            <StatPill label="Chaos" value={summary.chaosScore} />
-            <StatPill label="Ponder" value={100 - summary.idleRatio} />
+            <StatPill label="Discipline" value={summary.adherenceToBreakTime} />
+            <StatPill label="Flow" value={summary.flowScore} />
+            <StatPill label="Activity" value={100 - summary.idleRatio} />
           </div>
 
           <div className="flex flex-col gap-1.5">

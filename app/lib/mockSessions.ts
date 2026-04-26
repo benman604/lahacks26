@@ -143,7 +143,7 @@ export const MOCK_SESSIONS: SessionData[] = [
     idleTimeSeconds: 90,
   },
   {
-    userId: "andyroo",
+    userId: "andreww",
     title: "Late Night Grind - History Reading",
     idealBreakTimeMinutes: 10,
     startTimestamp: new Date("2026-04-25T21:10:00"),

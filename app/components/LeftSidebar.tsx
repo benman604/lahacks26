@@ -40,14 +40,15 @@ export default function LeftSidebar() {
   const lifetimeAverages = [
     { label: "Foc", value: `${averageMetrics.focus}` },
     { label: "Rec", value: `${averageMetrics.recovery}` },
-    { label: "Fix", value: `${averageMetrics.fixes}` },
-    { label: "Cha", value: `${averageMetrics.chaos}` },
-    { label: "Pon", value: `${averageMetrics.ponder}` },
+    { label: "Dis", value: `${averageMetrics.discipline}` },
+    { label: "Flo", value: `${averageMetrics.flow}` },
+    { label: "Act", value: `${averageMetrics.activity}` },
   ];
 
   const lifetimeStats = [
     { label: "Focus Hours", value: lifetime.focusHours },
     { label: "Completed Sessions", value: lifetime.completedSessions },
+    { label: "Avg Productivity", value: lifetime.averageProductiveScore },
     { label: "Most Studied", value: lifetime.mostStudied },
     { label: "Best Focus Streak", value: lifetime.bestFocusStreak },
   ];

@@ -1,4 +1,4 @@
-import type { SessionData, SessionMetrics } from "../types";
+import type { SessionData, SessionMetrics, SessionStats } from "../types";
 
 export function secondsBetween(start: Date, end: Date) {
   return Math.max(0, (new Date(end).getTime() - new Date(start).getTime()) / 1000);
@@ -60,35 +60,35 @@ function computeAverageDurationMinutes<T extends { startTimestamp: Date; endTime
   return totalSeconds / elements.length / 60;
 }
 
-function computeChaosScore(appElements: SessionData["appElements"]) {
-  const totalSeconds = appElements.reduce(
-    (sum, el) => sum + secondsBetween(el.startTimestamp, el.endTimestamp),
+function calculateFlowScore(
+  focusElements: SessionData["focusElements"],
+  totalSessionTime: number
+): number {
+  const MIN_DEEP_WORK_THRESHOLD = 5 * 60;
+  const MAX_ALLOWED_SWITCHES_PER_HOUR = 10;
+
+  if (totalSessionTime <= 0) return 0;
+
+  const deepBlocks = focusElements.filter((el) => {
+    if (el.focusType !== "focus") return false;
+    const duration = secondsBetween(el.startTimestamp, el.endTimestamp);
+    return duration >= MIN_DEEP_WORK_THRESHOLD;
+  });
+
+  const deepDuration = deepBlocks.reduce(
+    (sum, block) => sum + secondsBetween(block.startTimestamp, block.endTimestamp),
     0
   );
+  const deepRatio = deepDuration / totalSessionTime;
 
-  if (totalSeconds <= 0) return 0;
+  const transitions = Math.max(0, focusElements.length - 1);
+  const maxAllowedSwitches = Math.max(
+    1,
+    Math.round((totalSessionTime / 3600) * MAX_ALLOWED_SWITCHES_PER_HOUR)
+  );
+  const transitionFactor = Math.max(0, 1 - transitions / maxAllowedSwitches);
 
-  const byActivity = new Map<string, number>();
-
-  for (const el of appElements) {
-    byActivity.set(
-      el.activityName,
-      (byActivity.get(el.activityName) ?? 0) +
-        secondsBetween(el.startTimestamp, el.endTimestamp)
-    );
-  }
-
-  const activityCount = byActivity.size;
-  if (activityCount <= 1) return 0;
-
-  const sumOfSquares = [...byActivity.values()].reduce((sum, seconds) => {
-    const p = seconds / totalSeconds;
-    return sum + p * p;
-  }, 0);
-
-  const simpsonDiversity = 1 - sumOfSquares;
-
-  return clampPercent(simpsonDiversity * 100);
+  return Math.round(clampPercent(deepRatio * transitionFactor * 100));
 }
 
 export function formatWeekRange(start: Date, end: Date) {
@@ -132,17 +132,17 @@ export function computeAverageMetrics(sessionList: SessionData[]) {
   const metricsTotals = sessionList.reduce(
     (totals, session) => {
       const metrics = computeSessionMetrics(session);
-      const ponderScore = 100 - metrics.idleRatio;
+      const activityScore = 100 - metrics.idleRatio;
 
       return {
         focus: totals.focus + metrics.productivityRate,
         recovery: totals.recovery + metrics.distractionRecoveryTime,
-        fixes: totals.fixes + metrics.adherenceToBreakTime,
-        chaos: totals.chaos + metrics.chaosScore,
-        ponder: totals.ponder + ponderScore,
+        discipline: totals.discipline + metrics.adherenceToBreakTime,
+        flow: totals.flow + metrics.flowScore,
+        activity: totals.activity + activityScore,
       };
     },
-    { focus: 0, recovery: 0, fixes: 0, chaos: 0, ponder: 0 }
+    { focus: 0, recovery: 0, discipline: 0, flow: 0, activity: 0 }
   );
 
   const divisor = Math.max(1, sessionList.length);
@@ -150,18 +150,42 @@ export function computeAverageMetrics(sessionList: SessionData[]) {
   return {
     focus: Math.round(metricsTotals.focus / divisor),
     recovery: Math.round(metricsTotals.recovery / divisor),
-    fixes: Math.round(metricsTotals.fixes / divisor),
-    chaos: Math.round(metricsTotals.chaos / divisor),
-    ponder: Math.round(metricsTotals.ponder / divisor),
+    discipline: Math.round(metricsTotals.discipline / divisor),
+    flow: Math.round(metricsTotals.flow / divisor),
+    activity: Math.round(metricsTotals.activity / divisor),
   };
 }
 
-export function computeSessionMetrics(session: SessionData): SessionMetrics {
-  if (session.summaryMetrics) {
-    return session.summaryMetrics;
-  }
+export const calculateProductivityScore = (stats: SessionStats): number => {
+  const normalizedIdleRatio = stats.idleRatio > 1 ? stats.idleRatio / 100 : stats.idleRatio;
+  const activeScore = 100 - normalizedIdleRatio * 100;
 
+  const weightedScore =
+    stats.productivityRate * 0.4 +
+    stats.distractionRecoveryTime * 0.2 +
+    stats.adherenceToBreakTime * 0.15 +
+    stats.flowScore * 0.15 +
+    activeScore * 0.1;
+
+  return Math.round(Math.min(100, Math.max(0, weightedScore)));
+};
+
+export function computeSessionMetrics(session: SessionData): SessionMetrics {
   const totalSeconds = secondsBetween(session.startTimestamp, session.endTimestamp);
+
+  if (session.summaryMetrics) {
+    const persisted = session.summaryMetrics as SessionMetrics & { chaosScore?: number };
+    if (typeof persisted.flowScore === "number") {
+      return persisted;
+    }
+
+    if (typeof persisted.chaosScore === "number") {
+      return {
+        ...persisted,
+        flowScore: 100 - persisted.chaosScore,
+      };
+    }
+  }
 
   const focusSeconds = session.focusElements
     .filter((el) => el.focusType === "focus")
@@ -175,12 +199,11 @@ export function computeSessionMetrics(session: SessionData): SessionMetrics {
 
   const averageDistractionMinutes = computeAverageDurationMinutes(distractionElements);
   const averageBreakMinutes = computeAverageDurationMinutes(breakElements);
-
   return {
     productivityRate: totalSeconds > 0 ? clampPercent((focusSeconds / totalSeconds) * 100) : 0,
     distractionRecoveryTime: calculateDistractionScore(averageDistractionMinutes, 30) * 100,
     adherenceToBreakTime: adherence(averageBreakMinutes, session.idealBreakTimeMinutes) * 100,
-    chaosScore: computeChaosScore(session.appElements),
+    flowScore: calculateFlowScore(session.focusElements, totalSeconds),
     idleRatio: totalSeconds > 0 ? clampPercent((session.idleTimeSeconds / totalSeconds) * 100) : 0,
   };
 }
@@ -248,9 +271,16 @@ export function computeLifetimeStats(sessionList: SessionData[]) {
   }
 
   const bestFocusStreakDays = computeSessionDayStreak(sessionList);
+  const averageProductiveScore = Math.round(
+    sessionList.reduce((sum, session) => {
+      const metrics = computeSessionMetrics(session);
+      return sum + calculateProductivityScore(metrics);
+    }, 0) / Math.max(1, sessionList.length)
+  );
 
   return {
     completedSessions: `${completedSessions}`,
+    averageProductiveScore: `${averageProductiveScore}%`,
     focusHours: `${focusHours.toFixed(1)}h`,
     mostStudied,
     bestFocusStreak: `${bestFocusStreakDays} days`,

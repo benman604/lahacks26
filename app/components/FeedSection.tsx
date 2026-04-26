@@ -11,7 +11,7 @@ import {
   subscribeToSessionsUpdated,
 } from "../lib/localSessions";
 import {
-  computeAverageMetrics,
+  calculateProductivityScore,
   computeSessionMetrics,
   computeSessionDayStreak,
   filterSessionsForCurrentWeek,
@@ -80,7 +80,7 @@ function buildDemoSessionFromInputs({
   const distractApps = ["Messages", "Social media", "Video clips", "Online shopping", "Group chat"];
 
   const pick = (arr: string[]) => arr[randInt(0, arr.length - 1)];
-  const demoUsers = ["andyroo", "ben", "esther", "andreww"];
+  const demoUsers = ["ben", "esther", "andreww"];
 
   return {
     userId: demoUsers[randInt(0, demoUsers.length - 1)],
@@ -142,7 +142,12 @@ export default function FeedSection({
     "text-sm border border-gray-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-orange-400";
 
   const weeklySessions = filterSessionsForCurrentWeek(sessions);
-  const averageMetrics = computeAverageMetrics(weeklySessions);
+  const averageWeeklyProductiveScore = Math.round(
+    weeklySessions.reduce((sum, session) => {
+      const metrics = computeSessionMetrics(session);
+      return sum + calculateProductivityScore(metrics);
+    }, 0) / Math.max(1, weeklySessions.length)
+  );
   const weeklyFocusMinutes = Math.round(
     weeklySessions.reduce((sum, session) => {
       const totalSeconds = secondsBetween(session.startTimestamp, session.endTimestamp);
@@ -154,7 +159,7 @@ export default function FeedSection({
   const weeklySnapshot = [
     { label: "Focus minutes", value: `${weeklyFocusMinutes}`, delta: "week" },
     { label: "Sessions", value: `${weeklySessions.length}`, delta: "count" },
-    { label: "Avg Focus", value: `${averageMetrics.focus}%`, delta: "avg" },
+    { label: "Avg Productivity", value: `${averageWeeklyProductiveScore}%`, delta: "avg" },
     { label: "Longest streak", value: `${longestWeeklyStreak} days`, delta: "best" },
   ];
   const { start: weekStart, end: weekEnd } = getCurrentWeekBounds();
@@ -284,7 +289,7 @@ export default function FeedSection({
               ? "Ben M."
               : session.userId === "esther"
                 ? "Esther E."
-                : session.userId === "andyroo"
+                : session.userId === "andreww"
                   ? "Andyroo"
                   : "Unknown User"
           }

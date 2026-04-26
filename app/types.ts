@@ -48,9 +48,11 @@ export type SessionMetrics = {
 	productivityRate: number;
 	distractionRecoveryTime: number;
 	adherenceToBreakTime: number;
-	chaosScore: number;
+	flowScore: number;
 	idleRatio: number;
 }
+
+export type SessionStats = SessionMetrics;
 
 export type FocusTimelineSummarySegment = {
 	focusType: "focus" | "distracted" | "break";
@@ -82,8 +84,8 @@ export type SessionSummary = {
 	distractionRecoveryTime: number;
 	// Adherence(average break time, ideal break time)
 	adherenceToBreakTime: number;
-	// Use Shannon entropy over all activities in the session (divided by log(# of activities) to normalize) and then multiplied by 100 to get a score from 0-100
-	chaosScore: number;
+	// Flow score from productive block duration and productive switch frequency.
+	flowScore: number;
 	// (Idle Time) / (Total Time)
 	idleRatio: number;
 }
