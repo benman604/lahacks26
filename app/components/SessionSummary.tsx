@@ -144,7 +144,7 @@ function buildSession(session: RawSessionData): SessionData {
   return {
     userId: "you",
     title: session.title,
-    idealBreakTimeMinutes: session.idealBreakTimeMinutes,
+    totalBreakTimeMinutes: session.totalBreakTimeMinutes,
     startTimestamp: start,
     endTimestamp: end,
     focusElements,

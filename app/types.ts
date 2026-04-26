@@ -31,7 +31,7 @@ export type ScreenshotData = {
 export type RawSessionData = {
 	title: string;
 	subject: string;
-	idealBreakTimeMinutes: number;
+	totalBreakTimeMinutes: number;
 	startTimestamp: Date;
 	endTimestamp: Date;
 	data: ScreenshotData[];
@@ -40,7 +40,7 @@ export type RawSessionData = {
 export type SessionData = {
 	userId: string;
 	title: string;
-	idealBreakTimeMinutes: number;
+	totalBreakTimeMinutes: number;
 	startTimestamp: Date;
 	endTimestamp: Date;
 	focusElements: FocusElement[];

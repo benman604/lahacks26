@@ -57,7 +57,7 @@ type ScreenshotDataWire = {
 type RawSessionDataWire = {
   title?: unknown;
   subject?: unknown;
-  idealBreakTimeMinutes?: unknown;
+  totalBreakTimeMinutes?: unknown;
   startTimestamp?: unknown;
   endTimestamp?: unknown;
   data?: unknown;
@@ -106,7 +106,7 @@ function normalizeRawSessionData(payload: RawSessionDataWire): RawSessionData {
   return {
     title: typeof payload.title === "string" ? payload.title : "Session",
     subject: typeof payload.subject === "string" ? payload.subject : "",
-    idealBreakTimeMinutes: toPositiveNumber(payload.idealBreakTimeMinutes, 10),
+    totalBreakTimeMinutes: toPositiveNumber(payload.totalBreakTimeMinutes, 10),
     startTimestamp,
     endTimestamp,
     data,
@@ -160,7 +160,7 @@ export default function Home() {
   const [breakTime, setBreakTime] = React.useState("10");
 
   function buildRawSessionData(): RawSessionData {
-    const idealBreakTimeMinutes = parsePositiveInt(breakTime, 10);
+    const totalBreakTimeMinutes = parsePositiveInt(breakTime, 10);
     const startTimestamp = new Date();
     const cleanSubject = subject.trim() || (highlightedPost ? deriveSubjectFromTitle(highlightedPost.title) : "");
     const sessionTitle = cleanSubject || highlightedPost?.title || "Session";
@@ -168,7 +168,7 @@ export default function Home() {
     return {
       title: sessionTitle,
       subject: cleanSubject || "",
-      idealBreakTimeMinutes,
+      totalBreakTimeMinutes,
       startTimestamp,
       endTimestamp: startTimestamp,
       data: [],

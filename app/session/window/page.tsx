@@ -17,7 +17,7 @@ const ANALYSIS_INTERVAL_MS = 100 * 1000; // analyze every 40 seconds
 type RawSessionDataWire = {
   title?: unknown;
   subject?: unknown;
-  idealBreakTimeMinutes?: unknown;
+  totalBreakTimeMinutes?: unknown;
   startTimestamp?: unknown;
   endTimestamp?: unknown;
   data?: unknown;
@@ -120,7 +120,7 @@ export default function SessionWindow() {
       setRawSessionData({
         title: typeof incoming.title === "string" ? incoming.title : "Session",
         subject: typeof incoming.subject === "string" ? incoming.subject : "",
-        idealBreakTimeMinutes: toPositiveNumber(incoming.idealBreakTimeMinutes, 10),
+        totalBreakTimeMinutes: toPositiveNumber(incoming.totalBreakTimeMinutes, 10),
         startTimestamp,
         endTimestamp,
         data: Array.isArray(incoming.data) ? (incoming.data as ScreenshotData[]) : [],
@@ -192,7 +192,7 @@ export default function SessionWindow() {
   // initialize break budget once when session data first arrives
   useEffect(() => {
     if (rawSessionData && !breakInitializedRef.current) {
-      setBreakSecondsLeft(rawSessionData.idealBreakTimeMinutes * 60);
+      setBreakSecondsLeft(rawSessionData.totalBreakTimeMinutes * 60);
       breakInitializedRef.current = true;
     }
   }, [rawSessionData]);

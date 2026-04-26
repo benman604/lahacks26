@@ -25,7 +25,7 @@ const sessions: SessionData[] = [
   {
     userId: "ben",
     title: "Afternoon Study — Organic Chem",
-    idealBreakTimeMinutes: 5,
+    totalBreakTimeMinutes: 5,
     startTimestamp: new Date("2026-04-25T17:49:00"),
     endTimestamp: new Date("2026-04-25T19:29:00"),
     focusElements: [
@@ -92,7 +92,7 @@ const sessions: SessionData[] = [
   {
     userId: "esther",
     title: "Morning Focus — Linear Algebra",
-    idealBreakTimeMinutes: 8,
+    totalBreakTimeMinutes: 8,
     startTimestamp: new Date("2026-04-25T11:02:00"),
     endTimestamp: new Date("2026-04-25T12:02:00"),
     focusElements: [
@@ -139,7 +139,7 @@ const sessions: SessionData[] = [
   {
     userId: "andyroo",
     title: "Late Night Grind — History Reading",
-    idealBreakTimeMinutes: 10,
+    totalBreakTimeMinutes: 10,
     startTimestamp: new Date("2026-04-25T21:10:00"),
     endTimestamp: new Date("2026-04-25T22:40:00"),
     focusElements: [

@@ -150,7 +150,7 @@ function computeSessionSummary(
     productivityRate: totalSeconds > 0 ? clampPercent((focusSeconds / totalSeconds) * 100) : 0,
     distractionRecoveryTime: calculateDistractionScore(averageDistractionMinutes, 30) * 100,
     adherenceToBreakTime:
-      adherence(averageBreakMinutes, session.idealBreakTimeMinutes) * 100,
+      adherence(averageBreakMinutes, session.totalBreakTimeMinutes) * 100,
     chaosScore: computeChaosScore(session.appElements),
     idleRatio: totalSeconds > 0 ? clampPercent((session.idleTimeSeconds / totalSeconds) * 100) : 0,
   };
