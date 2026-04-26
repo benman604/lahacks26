@@ -113,7 +113,10 @@ function computeChaosScore(appElements: SessionData["appElements"]) {
     return p > 0 ? sum - p * Math.log(p) : sum;
   }, 0);
 
-  return clampPercent((entropy / Math.log(activityCount)) * 100);
+  const normalizedEntropy = entropy / Math.log(activityCount);
+  const softenedEntropy = Math.pow(normalizedEntropy, 1.35);
+
+  return clampPercent(softenedEntropy * 100);
 }
 
 function computeSessionSummary(
@@ -203,12 +206,42 @@ function mixHex(a: string, b: string, t: number) {
 }
 
 function StatPill({ label, value }: { label: string; value: number }) {
+  const radius = 21;
+  const circumference = 2 * Math.PI * radius;
+  const progress = clampPercent(value);
+  const dashOffset = circumference * (1 - progress / 100);
+
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+    <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-center flex min-h-16 flex-col items-center justify-center">
       <div className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
         {label}
       </div>
-      <div className="text-lg font-bold text-gray-900">{Math.round(value)}</div>
+      <div className="relative mt-1 h-16 w-16">
+        <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90">
+          <circle
+            cx="32"
+            cy="32"
+            r={radius}
+            fill="none"
+            stroke="#e5e7eb"
+            strokeWidth="6"
+          />
+          <circle
+            cx="32"
+            cy="32"
+            r={radius}
+            fill="none"
+            stroke="var(--p2p-accent)"
+            strokeWidth="6"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center text-lg font-bold leading-none text-gray-900">
+          {Math.round(value)}
+        </div>
+      </div>
     </div>
   );
 }
@@ -216,14 +249,22 @@ function StatPill({ label, value }: { label: string; value: number }) {
 function RadarChart({ summary }: { summary: SessionSummary }) {
   const stats = [
     { label: "Focus", value: summary.productivityRate },
-    { label: "Distract", value: summary.distractionRecoveryTime },
+    { label: "Recovery", value: summary.distractionRecoveryTime },
     { label: "Breaks", value: summary.adherenceToBreakTime },
     { label: "Chaos", value: summary.chaosScore },
-    { label: "Thinking", value: 100 - summary.idleRatio },
+    { label: "Ponder", value: 100 - summary.idleRatio },
   ];
 
   const center = 110;
   const maxRadius = 76;
+  const outerVertices = [0, 1, 2, 3, 4].map((i) => {
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
+    return {
+      x: center + Math.cos(angle) * maxRadius,
+      y: center + Math.sin(angle) * maxRadius,
+    };
+  });
+  const outerPoints = outerVertices.map(({ x, y }) => `${x},${y}`).join(" ");
 
   const points = stats
     .map((stat, i) => {
@@ -241,24 +282,51 @@ function RadarChart({ summary }: { summary: SessionSummary }) {
       </div>
 
       <svg viewBox="-18 -18 256 266" className="h-56 w-full">
-        {[76, 52, 28].map((r) => (
+        <defs>
+          <radialGradient id="radarBaseGradient" cx="50%" cy="50%" r="58%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="100%" stopColor="#9ca3af" />
+          </radialGradient>
+        </defs>
+
+        <polygon
+          points={outerPoints}
+          fill="url(#radarBaseGradient)"
+          stroke="#6b7280"
+          strokeWidth="1.8"
+        />
+
+        {[0.75, 0.5, 0.25].map((ratio) => (
           <polygon
-            key={r}
-            points={[0, 1, 2, 3, 4]
-              .map((i) => {
-                const angle = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
-                return `${center + Math.cos(angle) * r},${center + Math.sin(angle) * r}`;
+            key={ratio}
+            points={outerVertices
+              .map(({ x, y }) => {
+                const px = center + (x - center) * ratio;
+                const py = center + (y - center) * ratio;
+                return `${px},${py}`;
               })
               .join(" ")}
             fill="none"
-            stroke="rgba(191,72,0,0.18)"
-            strokeWidth="1.5"
+            stroke="#9ca3af"
+            strokeWidth="1.2"
+          />
+        ))}
+
+        {outerVertices.map(({ x, y }, i) => (
+          <line
+            key={i}
+            x1={center}
+            y1={center}
+            x2={x}
+            y2={y}
+            stroke="#4b5563"
+            strokeWidth="1.6"
           />
         ))}
 
         <polygon
           points={points}
-          fill="rgba(191,72,0,0.18)"
+          fill="rgba(191,72,0,0.3)"
           stroke="var(--p2p-accent)"
           strokeWidth="3"
           strokeLinejoin="round"
@@ -275,7 +343,7 @@ function RadarChart({ summary }: { summary: SessionSummary }) {
               x={x}
               y={y}
               textAnchor="middle"
-              className="fill-gray-500 text-[10px] font-bold"
+              className="fill-gray-500 text-[12px] font-bold"
             >
               {stat.label}
             </text>
@@ -291,6 +359,15 @@ export default function SessionSummaryCard({
   username = "You",
 }: Props) {
   const summary = computeSessionSummary(session, username);
+  const roundedProductivity = Math.round(summary.productivityRate);
+  const isFocusedRed = roundedProductivity <= 69;
+  const isFocusedYellow = roundedProductivity >= 70 && roundedProductivity <= 89;
+  const focusBadgeBackground = isFocusedRed
+    ? "#dc2626"
+    : isFocusedYellow
+      ? "#facc15"
+      : "#16a34a";
+  const focusBadgeText = isFocusedYellow ? "#111827" : "#ffffff";
 
   const totalSeconds = secondsBetween(summary.startTimestamp, summary.endTimestamp);
 
@@ -299,10 +376,10 @@ export default function SessionSummaryCard({
 
     const color =
       el.focusType === "focus"
-        ? "bg-green-400"
+        ? "#87ae73"
         : el.focusType === "break"
-          ? "bg-blue-400"
-          : "bg-purple-400";
+          ? "#4f8bc3"
+          : "#b0a4d6";
 
     return {
       width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
@@ -311,7 +388,7 @@ export default function SessionSummaryCard({
     };
   });
 
-  const basePalette = ["#006d77", "#83c5be", "#edf6f9", "#ffddd2", "#e29578"];
+  const basePalette = ["#904c77", "#e49ab0", "#ecb8a5", "#eccfc3", "#957d95"];
   const tintPalette = basePalette.map((c) => mixHex(c, "#ffffff", 0.28));
   const shadePalette = basePalette.map((c) => mixHex(c, "#000000", 0.18));
   const appPalette = [...basePalette, ...tintPalette, ...shadePalette];
@@ -354,10 +431,10 @@ export default function SessionSummaryCard({
         </div>
 
         <div
-          className="rounded-full px-3 py-1 text-xs font-bold text-white shrink-0"
-          style={{ backgroundColor: "var(--p2p-accent)" }}
+          className="rounded-full px-3 py-1 text-xs font-bold shrink-0"
+          style={{ backgroundColor: focusBadgeBackground, color: focusBadgeText }}
         >
-          {Math.round(summary.productivityRate)}% focused
+          {roundedProductivity}% focused
         </div>
       </div>
 
@@ -367,7 +444,7 @@ export default function SessionSummaryCard({
         <div className="flex flex-col justify-center gap-4 min-w-0">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <StatPill label="Focus" value={summary.productivityRate} />
-            <StatPill label="Recover" value={summary.distractionRecoveryTime} />
+            <StatPill label="Recovery" value={summary.distractionRecoveryTime} />
             <StatPill label="Breaks" value={summary.adherenceToBreakTime} />
             <StatPill label="Chaos" value={summary.chaosScore} />
             <StatPill label="Ponder" value={100 - summary.idleRatio} />
@@ -384,7 +461,7 @@ export default function SessionSummaryCard({
                 <TimelineSegment
                   key={i}
                   width={segment.width}
-                  className={segment.color}
+                  style={{ backgroundColor: segment.color }}
                   tooltip={segment.tooltip}
                 />
               ))}

@@ -9,7 +9,7 @@ const sessions: SessionData[] = [
   {
     userId: "ben",
     title: "Afternoon Study — Organic Chem",
-    idealBreakTimeMinutes: 10,
+    idealBreakTimeMinutes: 5,
     startTimestamp: new Date("2026-04-25T17:49:00"),
     endTimestamp: new Date("2026-04-25T19:29:00"),
     focusElements: [
@@ -33,6 +33,11 @@ const sessions: SessionData[] = [
         endTimestamp: new Date("2026-04-25T19:19:00"),
         focusType: "distracted",
       },
+      {
+        startTimestamp: new Date("2026-04-25T19:19:00"),
+        endTimestamp: new Date("2026-04-25T19:29:00"),
+        focusType: "focus",
+      }
     ],
     appElements: [
       {
@@ -114,6 +119,88 @@ const sessions: SessionData[] = [
       },
     ],
     idleTimeSeconds: 90,
+  },
+  {
+    userId: "andyroo",
+    title: "Late Night Grind — History Reading",
+    idealBreakTimeMinutes: 10,
+    startTimestamp: new Date("2026-04-25T21:10:00"),
+    endTimestamp: new Date("2026-04-25T22:40:00"),
+    focusElements: [
+      {
+        startTimestamp: new Date("2026-04-25T21:10:00"),
+        endTimestamp: new Date("2026-04-25T21:16:00"),
+        focusType: "focus",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:16:00"),
+        endTimestamp: new Date("2026-04-25T21:34:00"),
+        focusType: "distracted",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:34:00"),
+        endTimestamp: new Date("2026-04-25T21:48:00"),
+        focusType: "break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:48:00"),
+        endTimestamp: new Date("2026-04-25T22:17:00"),
+        focusType: "distracted",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T22:17:00"),
+        endTimestamp: new Date("2026-04-25T22:28:00"),
+        focusType: "break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T22:28:00"),
+        endTimestamp: new Date("2026-04-25T22:40:00"),
+        focusType: "distracted",
+      },
+    ],
+    appElements: [
+      {
+        startTimestamp: new Date("2026-04-25T21:10:00"),
+        endTimestamp: new Date("2026-04-25T21:16:00"),
+        activityName: "Reading outline",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:16:00"),
+        endTimestamp: new Date("2026-04-25T21:25:00"),
+        activityName: "Short videos",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:25:00"),
+        endTimestamp: new Date("2026-04-25T21:34:00"),
+        activityName: "Group chat",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:34:00"),
+        endTimestamp: new Date("2026-04-25T21:48:00"),
+        activityName: "Break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:48:00"),
+        endTimestamp: new Date("2026-04-25T22:06:00"),
+        activityName: "Social media",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T22:06:00"),
+        endTimestamp: new Date("2026-04-25T22:17:00"),
+        activityName: "Online shopping",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T22:17:00"),
+        endTimestamp: new Date("2026-04-25T22:28:00"),
+        activityName: "Break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T22:28:00"),
+        endTimestamp: new Date("2026-04-25T22:40:00"),
+        activityName: "Messages",
+      },
+    ],
+    idleTimeSeconds: 1140,
   },
 ];
 
@@ -198,7 +285,15 @@ export default function FeedSection({
         <SessionSummaryCard
           key={`${session.userId}-${session.startTimestamp.toISOString()}`}
           session={session}
-          username={session.userId === "ben" ? "Ben M." : "Esther E."}
+          username={
+            session.userId === "ben"
+              ? "Ben M."
+              : session.userId === "esther"
+                ? "Esther E."
+                : session.userId === "andyroo"
+                  ? "Andyroo"
+                  : "Unknown User"
+          }
         />
       ))}
     </main>
