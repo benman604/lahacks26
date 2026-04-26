@@ -45,31 +45,61 @@ function computeAverageDurationMinutes<T extends { startTimestamp: Date; endTime
 function calculateFlowScore(
 	focusElements: SessionData["focusElements"],
 	totalSessionTime: number,
-) {
-	const MIN_DEEP_WORK_THRESHOLD = 5 * 60;
-	const MAX_ALLOWED_SWITCHES_PER_HOUR = 10;
+	distractionCount: number,
+): number {
+	const MIN_DEEP_WORK_THRESHOLD = 8 * 60; // 8 mins
+	const MAX_ALLOWED_SWITCHES_PER_HOUR = 3; 
+	const PENALTY_PER_EXCESS_SWITCH = 5;
 
-	if (totalSessionTime <= 0) return 0;
+	if (totalSessionTime <= 0 || focusElements.length === 0) return 0;
 
-	const deepBlocks = focusElements.filter((el) => {
-		if (el.focusType !== "productive" && el.focusType !== "supportive") return false;
-		return secondsBetween(el.startTimestamp, el.endTimestamp) >= MIN_DEEP_WORK_THRESHOLD;
+	// 1. Filter for "Work Time" (Focus + Distract)
+	// We exclude 'break' type elements entirely from the Flow calculation
+	const workElements = focusElements.filter(el => el.focusType !== "break");
+
+	if (workElements.length === 0) return 0;
+
+	// 2. Calculate Deep Work Quality
+	// Only 'focus' elements long enough count toward deepDuration
+	const deepBlocks = workElements.filter((el) => {
+		const duration = secondsBetween(el.startTimestamp, el.endTimestamp);
+		return (el.focusType === "productive" || el.focusType === "supportive") && duration >= MIN_DEEP_WORK_THRESHOLD;
 	});
 
 	const deepDuration = deepBlocks.reduce(
 		(sum, block) => sum + secondsBetween(block.startTimestamp, block.endTimestamp),
-		0,
+		0
 	);
-	const deepRatio = deepDuration / totalSessionTime;
 
-	const transitions = Math.max(0, focusElements.length - 1);
+	// Denominator: Total time that was NOT a break (includes focus AND distract)
+	const totalNonBreakTime = workElements.reduce(
+		(sum, el) => sum + secondsBetween(el.startTimestamp, el.endTimestamp),
+		0
+	);
+
+	// Base score: (Deep Focus Time) / (Total Work Time)
+	const deepRatioScore = totalNonBreakTime > 0 ? (deepDuration / totalNonBreakTime) * 100 : 0;
+
+	// 3. The Budget-Based Penalty
+	// Transitions are calculated over all work-related blocks (pivoting or getting distracted)
+	const transitions = Math.max(0, workElements.length - 1 + distractionCount);
+	const sessionHours = totalSessionTime / 3600;
+
 	const maxAllowedSwitches = Math.max(
-		1,
-		Math.round((totalSessionTime / 3600) * MAX_ALLOWED_SWITCHES_PER_HOUR),
+		2, 
+		Math.ceil(sessionHours * MAX_ALLOWED_SWITCHES_PER_HOUR)
 	);
-	const transitionFactor = Math.max(0, 1 - transitions / maxAllowedSwitches);
 
-	return Math.round(clampPercent(deepRatio * transitionFactor * 100));
+	let transitionPenalty = 0;
+	if (transitions > maxAllowedSwitches) {
+		const excess = transitions - maxAllowedSwitches;
+		transitionPenalty = excess * PENALTY_PER_EXCESS_SWITCH;
+	}
+
+	// 4. Final Calculation
+	const finalScore = deepRatioScore - transitionPenalty;
+
+	return Math.round(clampPercent(finalScore));
 }
 
 export function computeSessionSummary(session: SessionData): SessionSummary {
@@ -92,7 +122,7 @@ export function computeSessionSummary(session: SessionData): SessionSummary {
 		productivityRate: totalSeconds > 0 ? clampPercent((focusSeconds / totalSeconds) * 100) : 0,
 		distractionRecoveryTime: 0,
 		adherenceToBreakTime: adherence(averageBreakMinutes, session.totalBreakTimeMinutes) * 100,
-		flowScore: calculateFlowScore(session.focusElements, totalSeconds),
+		flowScore: calculateFlowScore(session.focusElements, totalSeconds, session.distractionTimes?.length || 0),
 		idleRatio:
 			totalSeconds > 0 ? clampPercent((session.idleTimeSeconds / totalSeconds) * 100) : 0,
 	};

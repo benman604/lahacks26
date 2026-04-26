@@ -43,6 +43,7 @@ export type SessionData = {
 	totalBreakTimeMinutes: number;
 	startTimestamp: Date;
 	endTimestamp: Date;
+	distractionTimes: Date[];
 	focusElements: FocusElement[];
 	appElements: AppElement[];
 	idleTimeSeconds: number;
