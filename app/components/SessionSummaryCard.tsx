@@ -108,15 +108,14 @@ function computeChaosScore(appElements: SessionData["appElements"]) {
   const activityCount = byActivity.size;
   if (activityCount <= 1) return 0;
 
-  const entropy = [...byActivity.values()].reduce((sum, seconds) => {
+  const sumOfSquares = [...byActivity.values()].reduce((sum, seconds) => {
     const p = seconds / totalSeconds;
-    return p > 0 ? sum - p * Math.log(p) : sum;
+    return sum + p * p;
   }, 0);
 
-  const normalizedEntropy = entropy / Math.log(activityCount);
-  const softenedEntropy = Math.pow(normalizedEntropy, 1.35);
+  const simpsonDiversity = 1 - sumOfSquares;
 
-  return clampPercent(softenedEntropy * 100);
+  return clampPercent(simpsonDiversity * 100);
 }
 
 function computeSessionSummary(
@@ -250,7 +249,7 @@ function RadarChart({ summary }: { summary: SessionSummary }) {
   const stats = [
     { label: "Focus", value: summary.productivityRate },
     { label: "Recovery", value: summary.distractionRecoveryTime },
-    { label: "Breaks", value: summary.adherenceToBreakTime },
+    { label: "Fixes", value: summary.adherenceToBreakTime },
     { label: "Chaos", value: summary.chaosScore },
     { label: "Ponder", value: 100 - summary.idleRatio },
   ];
@@ -445,7 +444,7 @@ export default function SessionSummaryCard({
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <StatPill label="Focus" value={summary.productivityRate} />
             <StatPill label="Recovery" value={summary.distractionRecoveryTime} />
-            <StatPill label="Breaks" value={summary.adherenceToBreakTime} />
+            <StatPill label="Fixes" value={summary.adherenceToBreakTime} />
             <StatPill label="Chaos" value={summary.chaosScore} />
             <StatPill label="Ponder" value={100 - summary.idleRatio} />
           </div>

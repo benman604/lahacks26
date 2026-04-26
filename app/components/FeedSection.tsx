@@ -74,6 +74,33 @@ const sessions: SessionData[] = [
     idleTimeSeconds: 240,
   },
   {
+    userId: "ben",
+    title: "Evening Review — Microeconomics",
+    idealBreakTimeMinutes: 8,
+    startTimestamp: new Date("2026-04-25T20:00:00"),
+    endTimestamp: new Date("2026-04-25T21:20:00"),
+    focusElements: [
+      {
+        startTimestamp: new Date("2026-04-25T20:00:00"),
+        endTimestamp: new Date("2026-04-25T21:20:00"),
+        focusType: "focus",
+      },
+    ],
+    appElements: [
+      {
+        startTimestamp: new Date("2026-04-25T20:00:00"),
+        endTimestamp: new Date("2026-04-25T20:52:00"),
+        activityName: "Problem set",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T20:52:00"),
+        endTimestamp: new Date("2026-04-25T21:20:00"),
+        activityName: "Notes review",
+      },
+    ],
+    idleTimeSeconds: 60,
+  },
+  {
     userId: "esther",
     title: "Morning Focus — Linear Algebra",
     idealBreakTimeMinutes: 8,
