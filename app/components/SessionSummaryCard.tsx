@@ -277,10 +277,10 @@ export default function SessionSummaryCard({
             el.focusType === "productive"
               ? "#87ae73"
               : el.focusType === "supportive"
-                ? "#4f8bc3"
+                ? "#fbbf24"
                 : el.focusType === "neutral"
                   ? "#b0a4d6"
-                  : "#e5e7eb";
+                  : "#4f8bc3";
 
           return {
             width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
