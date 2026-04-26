@@ -29,11 +29,13 @@ export default function Home() {
       try {
         const monitor = await currentMonitor();
         if (!monitor) return;
-        const { width, height } = monitor.size;
+        const scale = monitor.scaleFactor;
+        const logicalWidth = monitor.size.width / scale;
+        const logicalHeight = monitor.size.height / scale;
         const w = 420;
         const h = 220;
-        const x = Math.floor((width - w) / 2);
-        const y = Math.floor((height - h) / 2);
+        const x = Math.floor((logicalWidth - w) / 2);
+        const y = Math.floor((logicalHeight - h) / 2);
         await win.setPosition(new LogicalPosition(x, y));
         await win.setSize(new LogicalSize(w, h));
       } catch (e) {
