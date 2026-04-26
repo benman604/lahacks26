@@ -95,6 +95,13 @@ function clampPercent(value: number) {
   return Math.max(0, Math.min(100, value));
 }
 
+function getTrafficLightColor(score: number) {
+  const rounded = Math.round(clampPercent(score));
+  if (rounded <= 69) return "#dc2626";
+  if (rounded <= 89) return "#facc15";
+  return "#16a34a";
+}
+
 function computeAverageDurationMinutes<T extends { startTimestamp: Date; endTimestamp: Date }>(
   elements: T[]
 ) {
@@ -249,6 +256,7 @@ function StatPill({ label, value }: { label: string; value: number }) {
   const circumference = 2 * Math.PI * radius;
   const progress = clampPercent(value);
   const dashOffset = circumference * (1 - progress / 100);
+  const ringColor = getTrafficLightColor(progress);
 
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-center flex min-h-16 flex-col items-center justify-center">
@@ -270,7 +278,7 @@ function StatPill({ label, value }: { label: string; value: number }) {
             cy="32"
             r={radius}
             fill="none"
-            stroke="var(--p2p-accent)"
+            stroke={ringColor}
             strokeWidth="6"
             strokeLinecap="round"
             strokeDasharray={circumference}
@@ -406,13 +414,8 @@ export default function SessionSummaryCard({
     flowScore: summary.flowScore,
     idleRatio: summary.idleRatio,
   });
-  const isFocusedRed = roundedProductivity <= 69;
+  const focusBadgeBackground = getTrafficLightColor(roundedProductivity);
   const isFocusedYellow = roundedProductivity >= 70 && roundedProductivity <= 89;
-  const focusBadgeBackground = isFocusedRed
-    ? "#dc2626"
-    : isFocusedYellow
-      ? "#facc15"
-      : "#16a34a";
   const focusBadgeText = isFocusedYellow ? "#111827" : "#ffffff";
 
   const totalSeconds = secondsBetween(summary.startTimestamp, summary.endTimestamp);
