@@ -21,6 +21,7 @@ export type ScreenshotData = {
 	focusType: "focus" | "distracted" | "break";
 	websiteOrApp: string;
 	isIdle: boolean;
+	description?: string;
 }
 
 export type RawSessionData = {

@@ -164,9 +164,10 @@ export default function Home() {
     const startTimestamp = new Date();
     const endTimestamp = new Date(startTimestamp.getTime() + plannedDurationMinutes * 60_000);
     const cleanSubject = subject.trim() || (highlightedPost ? deriveSubjectFromTitle(highlightedPost.title) : "");
+    const sessionTitle = cleanSubject || highlightedPost?.title || "Session";
 
     return {
-      title: highlightedPost?.title ?? `${cleanSubject || "Session"}`,
+      title: sessionTitle,
       subject: cleanSubject || "",
       plannedDurationMinutes,
       idealBreakTimeMinutes,
@@ -303,8 +304,6 @@ export default function Home() {
           highlightedPostId={highlightedPostId}
           onHighlightPostId={(postId) => {
             setHighlightedPostId(postId);
-            const p = posts.find((x) => x.id === postId);
-            if (p) setSubject(deriveSubjectFromTitle(p.title));
           }}
         />
       </main>

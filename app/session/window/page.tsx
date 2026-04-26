@@ -175,6 +175,7 @@ export default function SessionWindow() {
         focusType: data.focusType,
         websiteOrApp: data.websiteOrApp,
         isIdle: data.isIdle,
+        description: data.description,
       };
       appendHistory(entry);
     } catch (e) {
@@ -206,9 +207,6 @@ export default function SessionWindow() {
 	
 	useEffect(() => {
 		if (!recordingEnabled) return;
-
-		// the first screenshot
-		analyzeCurrentScreenshot();
 
 		// start analysing screenshots at intervals
 		const intervalId = window.setInterval(async () => {
