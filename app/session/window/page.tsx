@@ -412,82 +412,78 @@ export default function SessionWindow() {
   }
 
   return (
-    <div className="p-4 w-full h-full flex flex-col gap-4 items-center justify-center">
-      
-			{(!recordingEnabled || !streamRef.current) && (
-				<div>
-					<h2>Please enable screen recording on all screens to start your session</h2>
+    <div className="w-full h-full flex flex-col items-center justify-center bg-[#F5F4F0] p-4">
+
+      {(!recordingEnabled || !streamRef.current) && (
+        <div className="flex flex-col gap-3 w-full">
+          <h2 className="text-sm font-semibold text-[#1a1a1a]">Enable screen recording to start your session</h2>
           {recordingError && (
-            <p className="mt-2 text-sm text-red-600">{recordingError}</p>
+            <p className="text-xs text-red-600">{recordingError}</p>
           )}
-					<button
-						onClick={enableRecording}
-						className="px-3 py-1 rounded bg-purple-600 text-white hover:bg-purple-700"
-					>
-						Enable Recording
-					</button>
-				</div>
-			)}
+          <button
+            onClick={enableRecording}
+            className="py-1.5 rounded-lg text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: "var(--p2p-accent)" }}
+          >
+            Enable Recording
+          </button>
+        </div>
+      )}
 
-			{(recordingEnabled || streamRef.current) && (
-				<div>
-					<div className="flex flex-col items-center">
-						<h2 className="text-lg font-semibold">{rawSessionData?.title || "Session Controller"}</h2>
-					<div className="mt-2 text-2xl">{onBreak ? formatTime(Math.max(breakSecondsLeft, 0)) : formatTime(secondsLeft)}</div>
-					{onBreak && breakSecondsLeft < 0 && (
-						<div className="mt-1 text-sm text-orange-600">Break time exceeded by {formatTime(Math.abs(breakSecondsLeft))}</div>
-					)}
-					{!onBreak && (
-						<div className="mt-1 text-xs text-gray-500">Break remaining: {formatTime(Math.max(breakSecondsLeft, 0))}</div>
-					)}
-					<div className="mt-2 flex gap-2 items-center">
-						{!onBreak && (
-							<button onClick={startBreak} className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">
-								Take a break
-							</button>
-						)}
-							{onBreak && (
-								<>
-									<button onClick={endBreak} className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700">
-										End break
-									</button>
-									<button onClick={() => { endBreak(); openBlockers(); }} className="px-3 py-1 rounded bg-red-500 text-white hover:bg-red-600">
-										Re-block
-									</button>
-								</>
-							)}
+      {(recordingEnabled || streamRef.current) && (
+        <div className="flex flex-col gap-3 w-full">
+          <div className="flex flex-col items-center gap-1">
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest">
+              {onBreak ? "On Break" : "Focus"}
+            </h2>
+            <div className="text-3xl font-bold text-[#1a1a1a]">
+              {onBreak ? formatTime(Math.max(breakSecondsLeft, 0)) : formatTime(secondsLeft)}
+            </div>
+            {onBreak && breakSecondsLeft < 0 && (
+              <div className="text-xs text-red-500">Break exceeded by {formatTime(Math.abs(breakSecondsLeft))}</div>
+            )}
+            {!onBreak && (
+              <div className="text-xs text-gray-400">Break remaining: {formatTime(Math.max(breakSecondsLeft, 0))}</div>
+            )}
+            <p className="mt-1 text-sm font-medium text-[#1a1a1a]">{rawSessionData?.title || "Session"}</p>
+          </div>
 
-              <button onClick={endSession} className="px-3 py-1 rounded bg-gray-600 text-white">
-                End Session
+          <div className="flex gap-2">
+            {!onBreak && (
+              <button
+                onClick={startBreak}
+                className="flex-1 py-1.5 rounded-lg border border-gray-300 text-sm font-semibold text-[#1a1a1a] hover:bg-gray-50 transition-colors"
+              >
+                Take a break
               </button>
-
-							{/* <button
-								onClick={enableRecording}
-								disabled={recordingEnabled}
-								className={`px-3 py-1 rounded ${
-									recordingEnabled
-										? "bg-green-600 text-white cursor-default"
-										: "bg-purple-600 text-white hover:bg-purple-700"
-								}`}
-							>
-								{recordingEnabled ? "✓ Recording" : "Enable Recording"}
-							</button> */}
-						</div>
-					</div>
-          {/* <div className="flex gap-2 mt-3">
+            )}
+            {onBreak && (
+              <>
+                <button
+                  onClick={endBreak}
+                  className="flex-1 py-1.5 rounded-lg border border-gray-300 text-sm font-semibold text-[#1a1a1a] hover:bg-gray-50 transition-colors"
+                >
+                  End break
+                </button>
+                <button
+                  onClick={() => { endBreak(); openBlockers(); }}
+                  className="flex-1 py-1.5 rounded-lg border border-red-300 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  Re-block
+                </button>
+              </>
+            )}
             <button
-              onClick={() => openBlockers()}
-              className="px-3 py-1 rounded bg-red-600 text-white"
+              onClick={endSession}
+              className="flex-1 py-1.5 rounded-lg text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+              style={{ backgroundColor: "var(--p2p-accent)" }}
             >
-              Test Blocking
+              End Session
             </button>
-            <button onClick={analyzeCurrentScreenshot} className="px-3 py-1 rounded bg-blue-700 text-white">
-              Test Screenshot
-            </button>
-					</div> */}
-				</div>
-			)}
+          </div>
+        </div>
+      )}
 
-		</div>
-	);
+    </div>
+  );
 }

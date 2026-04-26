@@ -371,8 +371,8 @@ export default function Home() {
         const scale = monitor.scaleFactor;
         const logicalWidth = monitor.size.width / scale;
         const logicalHeight = monitor.size.height / scale;
-        const w = 420;
-        const h = 220;
+        const w = 320;
+        const h = 180;
         const x = Math.floor((logicalWidth - w) / 2);
         const y = Math.floor((logicalHeight - h) / 2);
         await win.setPosition(new LogicalPosition(x, y));
