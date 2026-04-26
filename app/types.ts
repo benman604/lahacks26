@@ -30,6 +30,7 @@ export type ScreenshotData = {
 
 export type RawSessionData = {
 	title: string;
+	subject: string;
 	totalBreakTimeMinutes: number;
 	startTimestamp: Date;
 	endTimestamp: Date;
@@ -43,10 +44,10 @@ export type SessionData = {
 	totalBreakTimeMinutes: number;
 	startTimestamp: Date;
 	endTimestamp: Date;
+	distractionTimes: Date[];
 	focusElements: FocusElement[];
 	appElements: AppElement[];
 	idleTimeSeconds: number;
-	distractionTimes: Date[];
 }
 
 // Define a function Adherence(average, ideal) that outputs a score from 0-100 based on the formula above
@@ -60,9 +61,9 @@ export type SessionSummary = {
 	appElements: AppElement[];
 	// Percentage of time spent focused during the session (focused time divided by total session time)
 	productivityRate: number;
-	// Adherence(average distraction recovery time, 0)
-	distractionRecoveryTime: number;
-	// Adherence(average break time, ideal break time)
+	// Stamina: a 0-100 score based on the longest focused streak without a distraction (100 at 60 minutes)
+	stamina: number;
+	// Adherence(total actual break time, allocated break time)
 	adherenceToBreakTime: number;
 	// Use Shannon entropy over all activities in the session (divided by log(# of activities) to normalize) and then multiplied by 100 to get a score from 0-100
 	flowScore: number;
@@ -72,11 +73,10 @@ export type SessionSummary = {
 
 export type SessionMetrics = {
 	productivityRate: number;
-	distractionRecoveryTime: number;
+	stamina: number;
 	adherenceToBreakTime: number;
 	flowScore: number;
 	idleRatio: number;
 }
 
 export type SessionStats = SessionMetrics;
-

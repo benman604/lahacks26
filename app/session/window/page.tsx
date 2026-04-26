@@ -124,6 +124,7 @@ export default function SessionWindow() {
         totalBreakTimeMinutes: toPositiveNumber(incoming.totalBreakTimeMinutes, 10),
         startTimestamp,
         endTimestamp,
+        distractionCount: 0,
         data: Array.isArray(incoming.data) ? (incoming.data as ScreenshotData[]) : [],
       });
     });

@@ -29,47 +29,109 @@ export function clampPercent(value: number) {
 	return Math.max(0, Math.min(100, value));
 }
 
-function computeAverageDurationMinutes<T extends { startTimestamp: Date; endTimestamp: Date }>(
-	elements: T[],
-) {
-	if (elements.length === 0) return 0;
+function staminaScoreFromLongestFocusStreakMinutes(
+	longestFocusStreakMinutes: number,
+	targetMinutes = 60,
+): number {
+	if (targetMinutes <= 0) return 0;
+	if (longestFocusStreakMinutes >= targetMinutes) return 100;
+	if (longestFocusStreakMinutes <= 0) return 0;
 
-	const totalSeconds = elements.reduce(
-		(sum, el) => sum + secondsBetween(el.startTimestamp, el.endTimestamp),
-		0,
+	// Use a normalized sigmoid curve (similar spirit to `adherence`: longer streak => higher score).
+	const alpha = 10 / targetMinutes;
+	const center = targetMinutes / 2;
+	const raw = 1 / (1 + Math.exp(-alpha * (longestFocusStreakMinutes - center)));
+	const raw0 = 1 / (1 + Math.exp(-alpha * (0 - center)));
+	const rawT = 1 / (1 + Math.exp(-alpha * (targetMinutes - center)));
+	const normalized = (raw - raw0) / (rawT - raw0);
+
+	return Math.round(clampPercent(normalized * 100));
+}
+
+function computeLongestFocusedStreakMinutes(focusElements: SessionData["focusElements"]): number {
+	if (focusElements.length === 0) return 0;
+
+	const elements = [...focusElements].sort(
+		(a, b) => new Date(a.startTimestamp).getTime() - new Date(b.startTimestamp).getTime(),
 	);
 
-	return totalSeconds / elements.length / 60;
+	let currentStreakSeconds = 0;
+	let longestStreakSeconds = 0;
+
+	for (const el of elements) {
+		const durationSeconds = secondsBetween(el.startTimestamp, el.endTimestamp);
+		const isFocused = el.focusType === "productive" || el.focusType === "supportive";
+
+		if (isFocused) {
+			currentStreakSeconds += durationSeconds;
+		} else {
+			longestStreakSeconds = Math.max(longestStreakSeconds, currentStreakSeconds);
+			currentStreakSeconds = 0;
+		}
+	}
+
+	longestStreakSeconds = Math.max(longestStreakSeconds, currentStreakSeconds);
+	return longestStreakSeconds / 60;
 }
 
 function calculateFlowScore(
 	focusElements: SessionData["focusElements"],
 	totalSessionTime: number,
-) {
-	const MIN_DEEP_WORK_THRESHOLD = 5 * 60;
-	const MAX_ALLOWED_SWITCHES_PER_HOUR = 10;
+	distractionCount: number,
+): number {
+	const MIN_DEEP_WORK_THRESHOLD = 8 * 60; // 8 mins
+	const MAX_ALLOWED_SWITCHES_PER_HOUR = 3; 
+	const PENALTY_PER_EXCESS_SWITCH = 5;
 
-	if (totalSessionTime <= 0) return 0;
+	if (totalSessionTime <= 0 || focusElements.length === 0) return 0;
 
-	const deepBlocks = focusElements.filter((el) => {
-		if (el.focusType !== "productive" && el.focusType !== "supportive") return false;
-		return secondsBetween(el.startTimestamp, el.endTimestamp) >= MIN_DEEP_WORK_THRESHOLD;
+	// 1. Filter for "Work Time" (Focus + Distract)
+	// We exclude 'break' type elements entirely from the Flow calculation
+	const workElements = focusElements.filter(el => el.focusType !== "break");
+
+	if (workElements.length === 0) return 0;
+
+	// 2. Calculate Deep Work Quality
+	// Only 'focus' elements long enough count toward deepDuration
+	const deepBlocks = workElements.filter((el) => {
+		const duration = secondsBetween(el.startTimestamp, el.endTimestamp);
+		return (el.focusType === "productive" || el.focusType === "supportive") && duration >= MIN_DEEP_WORK_THRESHOLD;
 	});
 
 	const deepDuration = deepBlocks.reduce(
 		(sum, block) => sum + secondsBetween(block.startTimestamp, block.endTimestamp),
-		0,
+		0
 	);
-	const deepRatio = deepDuration / totalSessionTime;
 
-	const transitions = Math.max(0, focusElements.length - 1);
+	// Denominator: Total time that was NOT a break (includes focus AND distract)
+	const totalNonBreakTime = workElements.reduce(
+		(sum, el) => sum + secondsBetween(el.startTimestamp, el.endTimestamp),
+		0
+	);
+
+	// Base score: (Deep Focus Time) / (Total Work Time)
+	const deepRatioScore = totalNonBreakTime > 0 ? (deepDuration / totalNonBreakTime) * 100 : 0;
+
+	// 3. The Budget-Based Penalty
+	// Transitions are calculated over all work-related blocks (pivoting or getting distracted)
+	const transitions = Math.max(0, workElements.length - 1 + distractionCount);
+	const sessionHours = totalSessionTime / 3600;
+
 	const maxAllowedSwitches = Math.max(
-		1,
-		Math.round((totalSessionTime / 3600) * MAX_ALLOWED_SWITCHES_PER_HOUR),
+		2, 
+		Math.ceil(sessionHours * MAX_ALLOWED_SWITCHES_PER_HOUR)
 	);
-	const transitionFactor = Math.max(0, 1 - transitions / maxAllowedSwitches);
 
-	return Math.round(clampPercent(deepRatio * transitionFactor * 100));
+	let transitionPenalty = 0;
+	if (transitions > maxAllowedSwitches) {
+		const excess = transitions - maxAllowedSwitches;
+		transitionPenalty = excess * PENALTY_PER_EXCESS_SWITCH;
+	}
+
+	// 4. Final Calculation
+	const finalScore = deepRatioScore - transitionPenalty;
+
+	return Math.round(clampPercent(finalScore));
 }
 
 export function computeSessionSummary(session: SessionData): SessionSummary {
@@ -80,7 +142,21 @@ export function computeSessionSummary(session: SessionData): SessionSummary {
 		.reduce((sum, el) => sum + secondsBetween(el.startTimestamp, el.endTimestamp), 0);
 
 	const breakElements = session.focusElements.filter((el) => el.focusType === "break");
-	const averageBreakMinutes = computeAverageDurationMinutes(breakElements);
+	const totalBreakMinutes =
+		breakElements.reduce(
+			(sum, el) => sum + secondsBetween(el.startTimestamp, el.endTimestamp),
+			0,
+		) / 60;
+
+	const effectiveDistractionTimes =
+		session.distractionTimes.length > 0
+			? session.distractionTimes
+			: session.focusElements
+					.filter((el) => el.focusType === "distracted")
+					.map((el) => el.startTimestamp);
+
+	const longestFocusedStreakMinutes = computeLongestFocusedStreakMinutes(session.focusElements);
+	const stamina = staminaScoreFromLongestFocusStreakMinutes(longestFocusedStreakMinutes, 60);
 
 	return {
 		username: "You",
@@ -90,9 +166,9 @@ export function computeSessionSummary(session: SessionData): SessionSummary {
 		focusElements: session.focusElements,
 		appElements: session.appElements,
 		productivityRate: totalSeconds > 0 ? clampPercent((focusSeconds / totalSeconds) * 100) : 0,
-		distractionRecoveryTime: 0,
-		adherenceToBreakTime: adherence(averageBreakMinutes, session.totalBreakTimeMinutes) * 100,
-		flowScore: calculateFlowScore(session.focusElements, totalSeconds),
+		stamina,
+		adherenceToBreakTime: adherence(totalBreakMinutes, session.totalBreakTimeMinutes) * 100,
+		flowScore: calculateFlowScore(session.focusElements, totalSeconds, effectiveDistractionTimes.length),
 		idleRatio:
 			totalSeconds > 0 ? clampPercent((session.idleTimeSeconds / totalSeconds) * 100) : 0,
 	};
@@ -104,7 +180,7 @@ export function computeProductivityScore(stats: SessionStats): number {
 
 	const weightedScore =
 		stats.productivityRate * 0.4 +
-		stats.distractionRecoveryTime * 0.2 +
+		stats.stamina * 0.2 +
 		stats.adherenceToBreakTime * 0.15 +
 		stats.flowScore * 0.15 +
 		activeScore * 0.1;
@@ -181,24 +257,22 @@ export function computeAverageMetrics(sessionList: SessionData[]) {
 
       return {
         focus: totals.focus + metrics.productivityRate,
-        recovery: totals.recovery + metrics.distractionRecoveryTime,
+				stamina: totals.stamina + metrics.stamina,
         discipline: totals.discipline + metrics.adherenceToBreakTime,
         flow: totals.flow + metrics.flowScore,
         activity: totals.activity + activityScore,
       };
     },
-    { focus: 0, recovery: 0, discipline: 0, flow: 0, activity: 0 }
+		{ focus: 0, stamina: 0, discipline: 0, flow: 0, activity: 0 }
   );
 
   const divisor = Math.max(1, sessionList.length);
 
   return {
     focus: Math.round(metricsTotals.focus / divisor),
-    recovery: Math.round(metricsTotals.recovery / divisor),
+		stamina: Math.round(metricsTotals.stamina / divisor),
     discipline: Math.round(metricsTotals.discipline / divisor),
     flow: Math.round(metricsTotals.flow / divisor),
     activity: Math.round(metricsTotals.activity / divisor),
   };
 }
-
-

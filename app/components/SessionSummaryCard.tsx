@@ -47,6 +47,7 @@ function formatSessionDateLabel(date: Date) {
 
 function getTrafficLightColor(score: number) {
   const rounded = Math.round(clampPercent(score));
+  if (rounded >= 100) return "#00F5FF"; // Electric Cyan for "Perfect"
   if (rounded <= 69) return "#dc2626";
   if (rounded <= 89) return "#facc15";
   return "#16a34a";
@@ -115,6 +116,18 @@ function StatPill({ label, value }: { label: string; value: number }) {
       </div>
       <div className="relative mt-1 h-16 w-16">
         <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90">
+          {/* 1. Define the Glow Filter */}
+          <defs>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* Background Circle */}
           <circle
             cx="32"
             cy="32"
@@ -123,6 +136,8 @@ function StatPill({ label, value }: { label: string; value: number }) {
             stroke="#e5e7eb"
             strokeWidth="6"
           />
+
+          {/* Progress Circle with Conditional Glow */}
           <circle
             cx="32"
             cy="32"
@@ -133,9 +148,20 @@ function StatPill({ label, value }: { label: string; value: number }) {
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={dashOffset}
+            // Only apply filter if value is 100
+            filter={value > 99 ? "url(#glow)" : "none"}
+            className="transition-all duration-500 ease-in-out"
           />
         </svg>
-        <div className="absolute inset-0 flex items-center justify-center text-lg font-bold leading-none text-gray-900">
+
+        {/* Center Text with Conditional Glow/Color */}
+        <div 
+          className="absolute inset-0 flex items-center justify-center text-lg font-bold leading-none"
+          style={{ 
+            color: value > 99 ? ringColor : "#111827",
+            textShadow: value > 99 ? `0 0 8px ${ringColor}44` : "none" 
+          }}
+        >
           {Math.round(value)}
         </div>
       </div>
@@ -146,7 +172,7 @@ function StatPill({ label, value }: { label: string; value: number }) {
 function RadarChart({ summary }: { summary: SessionSummary }) {
   const stats = [
     { label: "Focus", value: summary.productivityRate },
-    { label: "Recovery", value: summary.distractionRecoveryTime },
+    { label: "Stamina", value: summary.stamina },
     { label: "Discipline", value: summary.adherenceToBreakTime },
     { label: "Flow", value: summary.flowScore },
     { label: "Activity", value: 100 - summary.idleRatio },
@@ -259,35 +285,37 @@ export default function SessionSummaryCard({
   const sessionDateLabel = formatSessionDateLabel(summary.startTimestamp);
   const roundedProductivity = computeProductivityScore({
     productivityRate: summary.productivityRate,
-    distractionRecoveryTime: summary.distractionRecoveryTime,
+    stamina: summary.stamina,
     adherenceToBreakTime: summary.adherenceToBreakTime,
     flowScore: summary.flowScore,
     idleRatio: summary.idleRatio,
   });
   const focusBadgeBackground = getTrafficLightColor(roundedProductivity);
-  const isFocusedYellow = roundedProductivity >= 70 && roundedProductivity <= 89;
+  const isFocusedYellow = roundedProductivity >= 70 && roundedProductivity <= 89 || roundedProductivity >= 100;
   const focusBadgeText = isFocusedYellow ? "#111827" : "#ffffff";
 
   const totalSeconds = secondsBetween(summary.startTimestamp, summary.endTimestamp);
 
   const focusTimeline = summary.focusElements.map((el) => {
-          const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
-          
-          const color =
-            el.focusType === "productive"
-              ? "#87ae73"
-              : el.focusType === "supportive"
-                ? "#4f8bc3"
-                : el.focusType === "neutral"
-                  ? "#b0a4d6"
-                  : "#e5e7eb";
+    const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
 
-          return {
-            width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
-            color,
-            tooltip: `${el.focusType} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
-          };
-        })
+    const color =
+      el.focusType === "productive"
+        ? "#87ae73"
+        : el.focusType === "supportive"
+          ? "#fbbf24"
+          : el.focusType === "neutral"
+            ? "#b0a4d6"
+            : el.focusType === "distracted"
+              ? "#dc2626"
+              : "#4f8bc3";
+
+    return {
+      width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
+      color,
+      tooltip: `${el.focusType} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
+    };
+  });
 
   const basePalette = ["#904c77", "#e49ab0", "#ecb8a5", "#eccfc3", "#957d95"];
   const tintPalette = basePalette.map((c) => mixHex(c, "#ffffff", 0.28));
@@ -335,14 +363,21 @@ export default function SessionSummaryCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs text-gray-500">
-            {summary.username} · {sessionDateLabel} · {formatRange(summary.startTimestamp, summary.endTimestamp)}
+            {username} · {sessionDateLabel} · {formatRange(summary.startTimestamp, summary.endTimestamp)}
           </p>
           <h2 className="font-semibold text-xl mt-0.5">{summary.title}</h2>
         </div>
 
         <div
-          className="rounded-full px-3 py-1 text-xs font-bold shrink-0"
-          style={{ backgroundColor: focusBadgeBackground, color: focusBadgeText }}
+          className="rounded-full px-3 py-1 text-xs font-bold shrink-0 transition-all duration-500"
+          style={{ 
+            backgroundColor: focusBadgeBackground, 
+            color: focusBadgeText,
+            // Using filter: drop-shadow instead of box-shadow keeps the sizing more consistent
+            filter: roundedProductivity >= 100 
+              ? `drop-shadow(0 0 6px ${focusBadgeBackground})` 
+              : `drop-shadow(0 0 3px ${focusBadgeBackground}66)`
+          }}
         >
           {roundedProductivity}% productive
         </div>
@@ -354,7 +389,7 @@ export default function SessionSummaryCard({
         <div className="flex flex-col justify-center gap-4 min-w-0">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <StatPill label="Focus" value={summary.productivityRate} />
-            <StatPill label="Recovery" value={summary.distractionRecoveryTime} />
+            <StatPill label="Stamina" value={summary.stamina} />
             <StatPill label="Discipline" value={summary.adherenceToBreakTime} />
             <StatPill label="Flow" value={summary.flowScore} />
             <StatPill label="Activity" value={100 - summary.idleRatio} />
@@ -366,7 +401,7 @@ export default function SessionSummaryCard({
               <span>{formatRange(summary.startTimestamp, summary.endTimestamp)}</span>
             </div>
 
-            <div className="flex h-8 overflow-visible rounded-full bg-gray-100">
+            <div className="relative flex h-8 w-full overflow-visible rounded-full bg-gray-100">
               {focusTimeline.map((segment, i) => (
                 <TimelineSegment
                   key={i}
@@ -400,4 +435,3 @@ export default function SessionSummaryCard({
     </article>
   );
 }
-
