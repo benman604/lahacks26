@@ -10,7 +10,7 @@ const model = new ChatGoogleGenerativeAI({
 
 const ScreenshotDataSchema = z.object({
   //timestamp: z.date(),
-  focusType: z.enum(["focus", "distracted", "break"]).describe("Whether the user appears focused, distracted, or on a break"),
+  focusType: z.enum(["productive", "distracted", "break"]).describe("Whether the user appears productive, distracted, or on a break"),
   websiteOrApp: z.string().describe("The primary website or app currently visible. If on browser, identify the main website (e.g. 'YouTube', 'Reddit', 'Google Docs'). If on desktop, identify the primary application (e.g. 'Slack', 'VS Code', 'Finder')"),
   isIdle: z.boolean().describe("Whether the user is idle"),
   description: z.string().describe("Description of what is on screen"),
@@ -18,13 +18,18 @@ const ScreenshotDataSchema = z.object({
 
 const structuredModel = model.withStructuredOutput(ScreenshotDataSchema);
 
-const PROMPT =
-  "Analyze this screenshot. Identify the website or app visible. Determine if the user appears focused, distracted, or on a break. Then describe what you see on the screen in depth/what the user seems to be doing.";
+const HARDCODED_SITES = [
+  "Instagram",
+  "Discord",
+];
+
+const PROMPT = `Analyze this screenshot. Identify the website or app visible. Based on what the user is supposed to be working on, determine if the user appears productive/working towards their goals or distracted. Then describe what you see on the screen in depth/what the user seems to be doing.
+The following sites/apps are always considered distracting regardless of context: ${HARDCODED_SITES.join(", ")}.`;
 
 const HistoryItemSchema = z.object({
   // timestamp optional for compatibility
   timestamp: z.string().optional(),
-  focusType: z.enum(["focus", "distracted", "break"]),
+  focusType: z.enum(["productive", "distracted", "break"]),
   websiteOrApp: z.string(),
   isIdle: z.boolean(),
   description: z.string().optional(),
