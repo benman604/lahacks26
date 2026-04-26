@@ -135,8 +135,14 @@ export default function Home() {
       }
     });
 
-    const unlistenSessionEndPromise = listen<RawSessionDataWire>("SessionEnd", (event) => {
+    const unlistenSessionEndPromise = listen<RawSessionDataWire>("SessionEnd", async (event) => {
       setSessionSummaryData(normalizeRawSessionData(event.payload));
+
+      // un-minimize the main window when a session ends
+      const currentWindow = await WebviewWindow.getCurrent();
+      if (currentWindow) {
+        await currentWindow.unminimize();
+      }
     });
 
     return () => {
@@ -214,6 +220,12 @@ export default function Home() {
         const y = Math.floor((logicalHeight - h) / 2);
         await win.setPosition(new LogicalPosition(x, y));
         await win.setSize(new LogicalSize(w, h));
+
+        // Minimize the current window to reduce distraction
+        const currentWindow = await WebviewWindow.getCurrent();
+        if (currentWindow) {
+          await currentWindow.minimize();
+        }
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error("failed to position session window", e);
