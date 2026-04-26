@@ -4,8 +4,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { RawSessionData, ScreenshotData } from "@/app/types";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import {
-  availableMonitors,
-  type Monitor,
   LogicalPosition,
   LogicalSize,
   currentMonitor,
@@ -181,10 +179,9 @@ export default function SessionWindow() {
       appendHistory(entry);
 
       if (data.focusType === "distracted") {
-        await openBlockers();
-        if (data.instructOffDistraction) {
-          await emit("show-distraction-instruction", { instruction: data.instructOffDistraction });
-        }
+        const instruction =
+          typeof data.instructOffDistraction === "string" ? data.instructOffDistraction : undefined;
+        await openBlockers(instruction);
       }
     } catch (e) {
       console.error("analyzeCurrentScreenshot failed", e);
@@ -226,50 +223,56 @@ export default function SessionWindow() {
 		}
   }, [recordingEnabled, analyzeCurrentScreenshot]);
 
-  async function openBlockers() {
-    let monitors: Monitor[] = [];
-    try {
-      monitors = await availableMonitors();
-    } catch {
-      const m = await currentMonitor();
-      if (m) monitors = [m];
-    }
-
-    for (let i = 0; i < monitors.length; i++) {
-      const m = monitors[i];
-      const label = `blocker-${i}`;
-
-      const existing = await WebviewWindow.getByLabel(label);
-      if (existing) {
-        await existing.setFocus();
-        continue;
-      }
-
-      const blocker = new WebviewWindow(label, {
-        url: "/session/gbtw",
-        decorations: false,
-        alwaysOnTop: true,
-        resizable: false,
-        transparent: true,
-      });
-
-      blocker.once("tauri://created", async () => {
+  async function openBlockers(instruction?: string) {
+    const label = "blocker";
+    const existing = await WebviewWindow.getByLabel(label);
+    if (existing) {
+      // Recreate blocker when instruction changes so gbtw receives the latest URL param.
+      if (instruction) {
         try {
-          const scale = m.scaleFactor || 1;
-          const pos = m.position ?? { x: 0, y: 0 };
-          await blocker.setPosition(new LogicalPosition(pos.x / scale, pos.y / scale));
-          await blocker.setSize(new LogicalSize(m.size.width / scale, m.size.height / scale));
+          await existing.close();
         } catch (e) {
-          console.error("failed to size blocker", e);
+          console.error("failed to recreate blocker", e);
+          await existing.setFocus();
+          return;
         }
-      });
-
-      blocker.once("tauri://error", (e) => {
-        console.error("failed to create blocker", e);
-      });
-
-      blockerLabels.push(label);
+        const idx = blockerLabels.indexOf(label);
+        if (idx >= 0) blockerLabels.splice(idx, 1);
+      } else {
+        await existing.setFocus();
+        return;
+      }
     }
+
+    const monitor = await currentMonitor();
+    const blockerUrl = instruction
+      ? `/session/gbtw?instruction=${encodeURIComponent(instruction)}`
+      : "/session/gbtw";
+    const blocker = new WebviewWindow(label, {
+      url: blockerUrl,
+      decorations: false,
+      alwaysOnTop: true,
+      resizable: false,
+      transparent: true,
+    });
+
+    blocker.once("tauri://created", async () => {
+      try {
+        if (!monitor) return;
+        const scale = monitor.scaleFactor || 1;
+        const pos = monitor.position ?? { x: 0, y: 0 };
+        await blocker.setPosition(new LogicalPosition(pos.x / scale, pos.y / scale));
+        await blocker.setSize(new LogicalSize(monitor.size.width / scale, monitor.size.height / scale));
+      } catch (e) {
+        console.error("failed to size blocker", e);
+      }
+    });
+
+    blocker.once("tauri://error", (e) => {
+      console.error("failed to create blocker", e);
+    });
+
+    blockerLabels.push(label);
   }
 
   async function closeBlockers() {
