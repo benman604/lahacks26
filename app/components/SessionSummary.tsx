@@ -140,6 +140,9 @@ function buildSession(session: RawSessionData): SessionData {
   const focusElements = buildFocusElements(screenshots, start, end);
   const appElements = buildAppElements(screenshots, start, end);
   const idleTimeSeconds = computeIdleTimeSeconds(screenshots, end);
+  const distractionTimes = screenshots
+    .filter((e) => e.focusType === "distracted")
+    .map((e) => e.timestamp);
 
   return {
     userId: "you",
@@ -150,6 +153,7 @@ function buildSession(session: RawSessionData): SessionData {
     focusElements,
     appElements,
     idleTimeSeconds,
+    distractionTimes,
   };
 }
 
