@@ -16,7 +16,7 @@ export type AppElement = {
 	activityName: string;
 }
 
-export type FocusType = "productive" | "supportive" | "neutral" | "break";
+export type FocusType = "productive" | "supportive" | "neutral" | "break" | "distracted";
 
 export type ScreenshotData = {
 	timestamp: Date;
