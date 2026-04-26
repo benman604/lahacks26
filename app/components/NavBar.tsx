@@ -1,5 +1,12 @@
 export default function NavBar() {
   const navLinks = ["Feed", "Sessions", "Subjects", "Friends"];
+  const todayLabel = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+    .format(new Date())
+    .toUpperCase();
 
   return (
     <header className="w-full bg-white border-b border-gray-200 px-8 py-3 flex items-center">
@@ -31,7 +38,7 @@ export default function NavBar() {
       </nav>
 
       <span className="text-xs font-semibold tracking-widest uppercase text-gray-500">
-        APR 25, 2026 &middot; ANDREW SUH
+        {todayLabel}{" "}&middot; ANDREW SUH
       </span>
     </header>
   );

@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import type { SessionData, SessionSummary } from "../types";
+import { calculateProductivityScore } from "../lib/sessionStats";
 
 type Props = {
   session: SessionData;
@@ -70,8 +71,35 @@ function formatRange(start: Date, end: Date) {
   return `${formatTime(start)} – ${formatTime(end)}`;
 }
 
+function formatSessionDateLabel(date: Date) {
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (target.getTime() === today.getTime()) return "Today";
+  if (target.getTime() === yesterday.getTime()) return "Yesterday";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(target);
+}
+
 function clampPercent(value: number) {
   return Math.max(0, Math.min(100, value));
+}
+
+function getTrafficLightColor(score: number) {
+  const rounded = Math.round(clampPercent(score));
+  if (rounded <= 69) return "#dc2626";
+  if (rounded <= 89) return "#facc15";
+  return "#16a34a";
 }
 
 function computeAverageDurationMinutes<T extends { startTimestamp: Date; endTimestamp: Date }>(
@@ -87,41 +115,60 @@ function computeAverageDurationMinutes<T extends { startTimestamp: Date; endTime
   return totalSeconds / elements.length / 60;
 }
 
-function computeChaosScore(appElements: SessionData["appElements"]) {
-  const totalSeconds = appElements.reduce(
-    (sum, el) => sum + secondsBetween(el.startTimestamp, el.endTimestamp),
+function calculateFlowScore(focusElements: SessionData["focusElements"], totalSessionTime: number) {
+  const MIN_DEEP_WORK_THRESHOLD = 5 * 60;
+  const MAX_ALLOWED_SWITCHES_PER_HOUR = 10;
+
+  if (totalSessionTime <= 0) return 0;
+
+  const deepBlocks = focusElements.filter((el) => {
+    if (el.focusType !== "focus") return false;
+    return secondsBetween(el.startTimestamp, el.endTimestamp) >= MIN_DEEP_WORK_THRESHOLD;
+  });
+
+  const deepDuration = deepBlocks.reduce(
+    (sum, block) => sum + secondsBetween(block.startTimestamp, block.endTimestamp),
     0
   );
+  const deepRatio = deepDuration / totalSessionTime;
 
-  if (totalSeconds <= 0) return 0;
+  const transitions = Math.max(0, focusElements.length - 1);
+  const maxAllowedSwitches = Math.max(
+    1,
+    Math.round((totalSessionTime / 3600) * MAX_ALLOWED_SWITCHES_PER_HOUR)
+  );
+  const transitionFactor = Math.max(0, 1 - transitions / maxAllowedSwitches);
 
-  const byActivity = new Map<string, number>();
-
-  for (const el of appElements) {
-    byActivity.set(
-      el.activityName,
-      (byActivity.get(el.activityName) ?? 0) +
-        secondsBetween(el.startTimestamp, el.endTimestamp)
-    );
-  }
-
-  const activityCount = byActivity.size;
-  if (activityCount <= 1) return 0;
-
-  const sumOfSquares = [...byActivity.values()].reduce((sum, seconds) => {
-    const p = seconds / totalSeconds;
-    return sum + p * p;
-  }, 0);
-
-  const simpsonDiversity = 1 - sumOfSquares;
-
-  return clampPercent(simpsonDiversity * 100);
+  return Math.round(clampPercent(deepRatio * transitionFactor * 100));
 }
 
 function computeSessionSummary(
   session: SessionData,
   username: string,
 ): SessionSummary {
+  if (session.summaryMetrics) {
+    const persisted = session.summaryMetrics as typeof session.summaryMetrics & {
+      chaosScore?: number;
+    };
+
+    return {
+      username,
+      title: session.title,
+      startTimestamp: session.startTimestamp,
+      endTimestamp: session.endTimestamp,
+      focusElements: session.focusElements,
+      appElements: session.appElements,
+      productivityRate: session.summaryMetrics.productivityRate,
+      distractionRecoveryTime: session.summaryMetrics.distractionRecoveryTime,
+      adherenceToBreakTime: session.summaryMetrics.adherenceToBreakTime,
+      flowScore:
+        typeof persisted.flowScore === "number"
+          ? persisted.flowScore
+          : 100 - (persisted.chaosScore ?? 0),
+      idleRatio: session.summaryMetrics.idleRatio,
+    };
+  }
+
   const totalSeconds = secondsBetween(session.startTimestamp, session.endTimestamp);
 
   const focusSeconds = session.focusElements
@@ -150,7 +197,7 @@ function computeSessionSummary(
     distractionRecoveryTime: calculateDistractionScore(averageDistractionMinutes, 30) * 100,
     adherenceToBreakTime:
       adherence(averageBreakMinutes, session.idealBreakTimeMinutes) * 100,
-    chaosScore: computeChaosScore(session.appElements),
+    flowScore: calculateFlowScore(session.focusElements, totalSeconds),
     idleRatio: totalSeconds > 0 ? clampPercent((session.idleTimeSeconds / totalSeconds) * 100) : 0,
   };
 }
@@ -209,6 +256,7 @@ function StatPill({ label, value }: { label: string; value: number }) {
   const circumference = 2 * Math.PI * radius;
   const progress = clampPercent(value);
   const dashOffset = circumference * (1 - progress / 100);
+  const ringColor = getTrafficLightColor(progress);
 
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-center flex min-h-16 flex-col items-center justify-center">
@@ -230,7 +278,7 @@ function StatPill({ label, value }: { label: string; value: number }) {
             cy="32"
             r={radius}
             fill="none"
-            stroke="var(--p2p-accent)"
+            stroke={ringColor}
             strokeWidth="6"
             strokeLinecap="round"
             strokeDasharray={circumference}
@@ -249,9 +297,9 @@ function RadarChart({ summary }: { summary: SessionSummary }) {
   const stats = [
     { label: "Focus", value: summary.productivityRate },
     { label: "Recovery", value: summary.distractionRecoveryTime },
-    { label: "Fixes", value: summary.adherenceToBreakTime },
-    { label: "Chaos", value: summary.chaosScore },
-    { label: "Ponder", value: 100 - summary.idleRatio },
+    { label: "Discipline", value: summary.adherenceToBreakTime },
+    { label: "Flow", value: summary.flowScore },
+    { label: "Activity", value: 100 - summary.idleRatio },
   ];
 
   const center = 110;
@@ -358,34 +406,53 @@ export default function SessionSummaryCard({
   username = "You",
 }: Props) {
   const summary = computeSessionSummary(session, username);
-  const roundedProductivity = Math.round(summary.productivityRate);
-  const isFocusedRed = roundedProductivity <= 69;
+  const sessionDateLabel = formatSessionDateLabel(summary.startTimestamp);
+  const roundedProductivity = calculateProductivityScore({
+    productivityRate: summary.productivityRate,
+    distractionRecoveryTime: summary.distractionRecoveryTime,
+    adherenceToBreakTime: summary.adherenceToBreakTime,
+    flowScore: summary.flowScore,
+    idleRatio: summary.idleRatio,
+  });
+  const focusBadgeBackground = getTrafficLightColor(roundedProductivity);
   const isFocusedYellow = roundedProductivity >= 70 && roundedProductivity <= 89;
-  const focusBadgeBackground = isFocusedRed
-    ? "#dc2626"
-    : isFocusedYellow
-      ? "#facc15"
-      : "#16a34a";
   const focusBadgeText = isFocusedYellow ? "#111827" : "#ffffff";
 
   const totalSeconds = secondsBetween(summary.startTimestamp, summary.endTimestamp);
+  const compactTimeline = session.timelineSummary;
 
-  const focusTimeline = summary.focusElements.map((el) => {
-    const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
+  const focusTimeline =
+    summary.focusElements.length > 0
+      ? summary.focusElements.map((el) => {
+          const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
 
-    const color =
-      el.focusType === "focus"
-        ? "#87ae73"
-        : el.focusType === "break"
-          ? "#4f8bc3"
-          : "#b0a4d6";
+          const color =
+            el.focusType === "focus"
+              ? "#87ae73"
+              : el.focusType === "break"
+                ? "#4f8bc3"
+                : "#b0a4d6";
 
-    return {
-      width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
-      color,
-      tooltip: `${el.focusType} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
-    };
-  });
+          return {
+            width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
+            color,
+            tooltip: `${el.focusType} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
+          };
+        })
+      : (compactTimeline?.focusSegments ?? []).map((segment) => {
+          const color =
+            segment.focusType === "focus"
+              ? "#87ae73"
+              : segment.focusType === "break"
+                ? "#4f8bc3"
+                : "#b0a4d6";
+
+          return {
+            width: segment.widthPct,
+            color,
+            tooltip: `${segment.focusType} · ${Math.round(segment.widthPct)}%`,
+          };
+        });
 
   const basePalette = ["#904c77", "#e49ab0", "#ecb8a5", "#eccfc3", "#957d95"];
   const tintPalette = basePalette.map((c) => mixHex(c, "#ffffff", 0.28));
@@ -393,38 +460,55 @@ export default function SessionSummaryCard({
   const appPalette = [...basePalette, ...tintPalette, ...shadePalette];
 
   // Create app timeline segments, assigning colors based on activity name
-  const createAppTimeline = (appElements: SessionData["appElements"]) => {
+  const createAppTimeline = (
+    appElements: SessionData["appElements"],
+    compactSegments: Array<{ activityName: string; widthPct: number }>
+  ) => {
       const activityColors = new Map<string, string>();
       let nextColorIndex = 0;
 
-      const appTimeline = summary.appElements.map((el) => {
-        const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
+      const source =
+        appElements.length > 0
+          ? appElements.map((el) => {
+              const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
+              return {
+                activityName: el.activityName,
+                width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
+                tooltip: `${el.activityName} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
+              };
+            })
+          : compactSegments.map((segment) => ({
+              activityName: segment.activityName,
+              width: segment.widthPct,
+              tooltip: `${segment.activityName} · ${Math.round(segment.widthPct)}%`,
+            }));
 
-        let backgroundColor = activityColors.get(el.activityName);
+      const appTimeline = source.map((item) => {
+        let backgroundColor = activityColors.get(item.activityName);
         if (!backgroundColor) {
           backgroundColor = appPalette[nextColorIndex % appPalette.length];
-          activityColors.set(el.activityName, backgroundColor);
+          activityColors.set(item.activityName, backgroundColor);
           nextColorIndex += 1;
         }
 
         return {
-          width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
+          width: item.width,
           backgroundColor,
-          tooltip: `${el.activityName} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
+          tooltip: item.tooltip,
         };
       });
 
       return appTimeline;
   }
 
-  const appTimeline = createAppTimeline(summary.appElements);
+  const appTimeline = createAppTimeline(summary.appElements, compactTimeline?.appSegments ?? []);
 
   return (
     <article className="bg-white border border-gray-200 rounded-xl px-5 py-4 flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs text-gray-500">
-            {summary.username} · {formatRange(summary.startTimestamp, summary.endTimestamp)}
+            {summary.username} · {sessionDateLabel} · {formatRange(summary.startTimestamp, summary.endTimestamp)}
           </p>
           <h2 className="font-semibold text-xl mt-0.5">{summary.title}</h2>
         </div>
@@ -433,7 +517,7 @@ export default function SessionSummaryCard({
           className="rounded-full px-3 py-1 text-xs font-bold shrink-0"
           style={{ backgroundColor: focusBadgeBackground, color: focusBadgeText }}
         >
-          {roundedProductivity}% focused
+          {roundedProductivity}% productive
         </div>
       </div>
 
@@ -444,9 +528,9 @@ export default function SessionSummaryCard({
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <StatPill label="Focus" value={summary.productivityRate} />
             <StatPill label="Recovery" value={summary.distractionRecoveryTime} />
-            <StatPill label="Fixes" value={summary.adherenceToBreakTime} />
-            <StatPill label="Chaos" value={summary.chaosScore} />
-            <StatPill label="Ponder" value={100 - summary.idleRatio} />
+            <StatPill label="Discipline" value={summary.adherenceToBreakTime} />
+            <StatPill label="Flow" value={summary.flowScore} />
+            <StatPill label="Activity" value={100 - summary.idleRatio} />
           </div>
 
           <div className="flex flex-col gap-1.5">
