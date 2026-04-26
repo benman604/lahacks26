@@ -1,6 +1,7 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { HumanMessage } from "@langchain/core/messages";
 import * as z from "zod";
+import { ScreenshotData } from "@/app/types";
 
 const model = new ChatGoogleGenerativeAI({
   model: "gemini-2.5-flash",
@@ -20,26 +21,48 @@ const structuredModel = model.withStructuredOutput(ScreenshotDataSchema);
 const PROMPT =
   "Analyze this screenshot. Identify the website or app visible. Determine if the user appears focused, distracted, or on a break. Then describe what you see on the screen in depth/what the user seems to be doing";
 
+const HistoryItemSchema = z.object({
+  // timestamp optional for compatibility
+  timestamp: z.string().optional(),
+  focusType: z.enum(["focus", "distracted", "break"]),
+  websiteOrApp: z.string(),
+  isIdle: z.boolean(),
+  description: z.string().optional(),
+});
+
+const HistorySchema = z.array(HistoryItemSchema);
+
 export async function POST(req: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return Response.json({ error: "GEMINI_API_KEY not set" }, { status: 500 });
   }
 
-  const { dataUrl } = await req.json();
-  const [header, imageBase64] = dataUrl.split(",");
-  const mimeType = header.split(":")[1].split(";")[0];
+  const body = await req.json();
+  const { dataUrl, history = [] } = body as { dataUrl?: string; history?: unknown };
 
-  const message = new HumanMessage({
-    content: [
-      { type: "text", text: PROMPT },
-      {
-        type: "image_url",
-        image_url: { url: `data:${mimeType};base64,${imageBase64}` },
-      },
-    ],
-  });
+  const parsedHistory = HistorySchema.safeParse(history);
+  const historyItems = parsedHistory.success ? parsedHistory.data : [];
 
+  const [header, imageBase64] = (dataUrl || "").split(",");
+  const mimeType = header ? header.split(":")[1].split(";")[0] : "image/png";
+
+  // Build messages: prompt, then prior history summaries, then current image
+  const content: any[] = [];
+  content.push({ type: "text", text: PROMPT });
+
+  for (const h of historyItems) {
+    const when = h.timestamp ? `at ${h.timestamp}` : "previous";
+    const desc = h.description ? ` Description: ${h.description}` : "";
+    const txt = `Previous screenshot ${when} — focusType: ${h.focusType}; websiteOrApp: ${h.websiteOrApp}; isIdle: ${h.isIdle}.${desc}`;
+    content.push({ type: "text", text: txt });
+  }
+
+  if (imageBase64) {
+    content.push({ type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}` } });
+  }
+
+  const message = new HumanMessage({ content });
 
   const result: z.infer<typeof ScreenshotDataSchema> = await structuredModel.invoke([message]);
   console.log("[gemini]", JSON.stringify(result, null, 2));

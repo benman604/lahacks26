@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { ScreenshotData } from "@/app/types";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { availableMonitors, LogicalPosition, LogicalSize, currentMonitor } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
@@ -42,7 +43,54 @@ export default function SessionWindow() {
 
   }
 
-  const [image, setImage] = useState<{ base64: string; mimeType: string } | null>(null);
+  const MAX_CONTEXT_SIZE = 5;
+  const [history, setHistory] = useState<ScreenshotData[]>([]);
+
+  async function analyzeCurrentScreenshot() {
+    try {
+      // ensure recording active and video present
+      if (!streamRef.current || !videoRef.current) throw new Error("Recording not enabled");
+      if (!canvasRef.current) canvasRef.current = document.createElement("canvas");
+      const v = videoRef.current!;
+      const c = canvasRef.current!;
+      c.width = v.videoWidth || window.innerWidth;
+      c.height = v.videoHeight || window.innerHeight;
+      const ctx = c.getContext("2d");
+      if (!ctx) throw new Error("no canvas context");
+      ctx.drawImage(v, 0, 0, c.width, c.height);
+      const dataUrl = c.toDataURL("image/png");
+			console.log("screenshot taken, analyzing with Gemini...", { dataUrl, history });
+
+      const res = await fetch("/api/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataUrl, history }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        // eslint-disable-next-line no-console
+        console.error("gemini analyze failed", data);
+        return;
+      }
+
+      // append to history as ScreenshotData
+      const entry: ScreenshotData = {
+        timestamp: new Date(),
+        focusType: data.focusType,
+        websiteOrApp: data.websiteOrApp,
+        isIdle: data.isIdle,
+      };
+      setHistory((h) => {
+        const next = [...h, entry];
+        if (next.length > MAX_CONTEXT_SIZE) return next.slice(next.length - MAX_CONTEXT_SIZE);
+        return next;
+      });
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("analyzeCurrentScreenshot failed", e);
+    }
+  }
 
   useEffect(() => {
     const unlistenTrigger = listen("trigger-blockers", async () => {
@@ -125,44 +173,6 @@ export default function SessionWindow() {
     }
   }
 
-  async function takeScreenshotAndSend() {
-    try {
-      // recording must be enabled first
-      if (!streamRef.current) {
-        throw new Error("Recording not enabled. Click 'Enable Recording' first.");
-      }
-
-      const v = videoRef.current!;
-      if (!canvasRef.current) canvasRef.current = document.createElement("canvas");
-      const c = canvasRef.current!;
-      c.width = v.videoWidth || window.innerWidth;
-      c.height = v.videoHeight || window.innerHeight;
-      const ctx = c.getContext("2d");
-      if (!ctx) throw new Error("no canvas context");
-      ctx.drawImage(v, 0, 0, c.width, c.height);
-      const dataUrl = c.toDataURL("image/png");
-
-      // send to server
-      const res = await fetch("/api/gemini", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl }),
-      });
-
-      if (!res.ok) {
-        const txt = await res.text();
-        // eslint-disable-next-line no-console
-        console.error("screenshot upload failed", res.status, txt);
-      } else {
-        // eslint-disable-next-line no-console
-        console.log("screenshot uploaded");
-      }
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error("takeScreenshotAndSend failed", e);
-    }
-  }
-
   // count-up timer
   function startTimer() {
     if (timerRef.current) return;
@@ -232,16 +242,16 @@ export default function SessionWindow() {
 							</button>
 						</div>
 					</div>
-					<div className="flex gap-2">
-						<button
-							onClick={() => openBlockers()}
-							className="px-3 py-1 rounded bg-red-600 text-white"
-						>
-							Test Blocking
-						</button>
-						<button onClick={takeScreenshotAndSend} className="px-3 py-1 rounded bg-blue-700 text-white">
-							Test Screenshot
-						</button>
+            <div className="flex gap-2">
+                    <button
+                      onClick={() => openBlockers()}
+                      className="px-3 py-1 rounded bg-red-600 text-white"
+                    >
+                      Test Blocking
+                    </button>
+                    <button onClick={analyzeCurrentScreenshot} className="px-3 py-1 rounded bg-blue-700 text-white">
+                      Test Screenshot
+                    </button>
 						<button
 							onClick={() => {
 								stopTimer();
