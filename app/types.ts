@@ -7,7 +7,7 @@
 export type FocusElement = {
 	startTimestamp: Date;
 	endTimestamp: Date;
-	focusType: "focus" | "distracted" | "break";
+	focusType: FocusType;
 }
 
 export type AppElement = {
@@ -16,12 +16,16 @@ export type AppElement = {
 	activityName: string;
 }
 
+export type FocusType = "productive" | "supportive" | "neutral" | "distracted" | "break";
+
 export type ScreenshotData = {
 	timestamp: Date;
-	focusType: "focus" | "distracted" | "break";
+	focusType: FocusType;
 	websiteOrApp: string;
 	isIdle: boolean;
 	description?: string;
+	relevanceToSubject?: string;
+	confidence?: number | null;
 }
 
 export type RawSessionData = {
