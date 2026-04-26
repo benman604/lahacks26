@@ -45,7 +45,7 @@ export default function GPTW() {
             className="px-6 py-2 rounded-full bg-green-500 text-white hover:bg-green-600 transition"
             onClick={allowBreak}
           >
-            Allow
+            Start Break
           </button>
         </div>
 

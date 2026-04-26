@@ -12,7 +12,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 
 const blockerLabels: string[] = [];
 const MAX_CONTEXT_SIZE = 5;
-const ANALYSIS_INTERVAL_MS = 100 * 1000; // analyze every 40 seconds
+const ANALYSIS_INTERVAL_MS = 10 * 1000; // analyze every 40 seconds
 
 type RawSessionDataWire = {
   title?: unknown;
@@ -474,7 +474,7 @@ export default function SessionWindow() {
 							</button> */}
 						</div>
 					</div>
-          <div className="flex gap-2 mt-3">
+          {/* <div className="flex gap-2 mt-3">
             <button
               onClick={() => openBlockers()}
               className="px-3 py-1 rounded bg-red-600 text-white"
@@ -484,7 +484,7 @@ export default function SessionWindow() {
             <button onClick={analyzeCurrentScreenshot} className="px-3 py-1 rounded bg-blue-700 text-white">
               Test Screenshot
             </button>
-					</div>
+					</div> */}
 				</div>
 			)}
 
