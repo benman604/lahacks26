@@ -34,6 +34,7 @@ export type RawSessionData = {
 	totalBreakTimeMinutes: number;
 	startTimestamp: Date;
 	endTimestamp: Date;
+	distractionCount: number;
 	data: ScreenshotData[];
 }
 

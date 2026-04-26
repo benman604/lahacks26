@@ -55,6 +55,7 @@ export default function SessionWindow() {
   const [breakSecondsLeft, setBreakSecondsLeft] = useState<number>(0);
   const breakTimerRef = useRef<number | null>(null);
   const breakInitializedRef = useRef(false);
+  const distractionCountRef = useRef(0);
 
   // stable refs so static event handlers always call the latest version
   const rawSessionDataRef = useRef<RawSessionData | null>(null);
@@ -176,6 +177,7 @@ export default function SessionWindow() {
       appendHistory(entry);
 
       if (data.focusType === "distracted") {
+        distractionCountRef.current += 1;
         const instruction =
           typeof data.instructOffDistraction === "string" ? data.instructOffDistraction : undefined;
         await openBlockers(instruction);
@@ -385,6 +387,7 @@ export default function SessionWindow() {
     const sessionEndPayload: RawSessionData = {
       ...rawSessionData,
       endTimestamp: new Date(),
+      distractionCount: distractionCountRef.current,
       data: historyRef.current.slice(),
     };
 

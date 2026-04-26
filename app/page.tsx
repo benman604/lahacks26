@@ -60,6 +60,7 @@ type RawSessionDataWire = {
   totalBreakTimeMinutes?: unknown;
   startTimestamp?: unknown;
   endTimestamp?: unknown;
+  distractionCount?: unknown;
   data?: unknown;
 };
 
@@ -109,6 +110,7 @@ function normalizeRawSessionData(payload: RawSessionDataWire): RawSessionData {
     totalBreakTimeMinutes: toPositiveNumber(payload.totalBreakTimeMinutes, 10),
     startTimestamp,
     endTimestamp,
+    distractionCount: typeof payload.distractionCount === "number" ? payload.distractionCount : 0,
     data,
   };
 }
@@ -171,6 +173,7 @@ export default function Home() {
       totalBreakTimeMinutes,
       startTimestamp,
       endTimestamp: startTimestamp,
+      distractionCount: 0,
       data: [],
     };
   }
