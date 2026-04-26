@@ -1,247 +1,70 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import SessionSummaryCard from "./SessionSummaryCard";
 import type { SessionData } from "../types";
-
-const sessions: SessionData[] = [
-  {
-    userId: "ben",
-    title: "Afternoon Study — Organic Chem",
-    idealBreakTimeMinutes: 5,
-    startTimestamp: new Date("2026-04-25T17:49:00"),
-    endTimestamp: new Date("2026-04-25T19:29:00"),
-    focusElements: [
-      {
-        startTimestamp: new Date("2026-04-25T17:49:00"),
-        endTimestamp: new Date("2026-04-25T18:39:00"),
-        focusType: "focus",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T18:39:00"),
-        endTimestamp: new Date("2026-04-25T18:49:00"),
-        focusType: "break",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T18:49:00"),
-        endTimestamp: new Date("2026-04-25T19:09:00"),
-        focusType: "focus",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T19:09:00"),
-        endTimestamp: new Date("2026-04-25T19:19:00"),
-        focusType: "distracted",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T19:19:00"),
-        endTimestamp: new Date("2026-04-25T19:29:00"),
-        focusType: "focus",
-      }
-    ],
-    appElements: [
-      {
-        startTimestamp: new Date("2026-04-25T17:49:00"),
-        endTimestamp: new Date("2026-04-25T18:25:00"),
-        activityName: "Lecture notes",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T18:25:00"),
-        endTimestamp: new Date("2026-04-25T18:39:00"),
-        activityName: "Practice problems",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T18:39:00"),
-        endTimestamp: new Date("2026-04-25T18:49:00"),
-        activityName: "Break",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T18:49:00"),
-        endTimestamp: new Date("2026-04-25T19:09:00"),
-        activityName: "Flashcards",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T19:09:00"),
-        endTimestamp: new Date("2026-04-25T19:19:00"),
-        activityName: "Messages",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T19:19:00"),
-        endTimestamp: new Date("2026-04-25T19:29:00"),
-        activityName: "Practice problems",
-      },
-    ],
-    idleTimeSeconds: 240,
-  },
-  {
-    userId: "ben",
-    title: "Evening Review — Microeconomics",
-    idealBreakTimeMinutes: 8,
-    startTimestamp: new Date("2026-04-25T20:00:00"),
-    endTimestamp: new Date("2026-04-25T21:20:00"),
-    focusElements: [
-      {
-        startTimestamp: new Date("2026-04-25T20:00:00"),
-        endTimestamp: new Date("2026-04-25T21:20:00"),
-        focusType: "focus",
-      },
-    ],
-    appElements: [
-      {
-        startTimestamp: new Date("2026-04-25T20:00:00"),
-        endTimestamp: new Date("2026-04-25T20:52:00"),
-        activityName: "Problem set",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T20:52:00"),
-        endTimestamp: new Date("2026-04-25T21:20:00"),
-        activityName: "Notes review",
-      },
-    ],
-    idleTimeSeconds: 60,
-  },
-  {
-    userId: "esther",
-    title: "Morning Focus — Linear Algebra",
-    idealBreakTimeMinutes: 8,
-    startTimestamp: new Date("2026-04-25T11:02:00"),
-    endTimestamp: new Date("2026-04-25T12:02:00"),
-    focusElements: [
-      {
-        startTimestamp: new Date("2026-04-25T11:02:00"),
-        endTimestamp: new Date("2026-04-25T11:47:00"),
-        focusType: "focus",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T11:47:00"),
-        endTimestamp: new Date("2026-04-25T11:55:00"),
-        focusType: "break",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T11:55:00"),
-        endTimestamp: new Date("2026-04-25T12:02:00"),
-        focusType: "focus",
-      },
-    ],
-    appElements: [
-      {
-        startTimestamp: new Date("2026-04-25T11:02:00"),
-        endTimestamp: new Date("2026-04-25T11:30:00"),
-        activityName: "Problem set",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T11:30:00"),
-        endTimestamp: new Date("2026-04-25T11:47:00"),
-        activityName: "Proof review",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T11:47:00"),
-        endTimestamp: new Date("2026-04-25T11:55:00"),
-        activityName: "Break",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T11:55:00"),
-        endTimestamp: new Date("2026-04-25T12:02:00"),
-        activityName: "Lecture recap",
-      },
-    ],
-    idleTimeSeconds: 90,
-  },
-  {
-    userId: "andyroo",
-    title: "Late Night Grind — History Reading",
-    idealBreakTimeMinutes: 10,
-    startTimestamp: new Date("2026-04-25T21:10:00"),
-    endTimestamp: new Date("2026-04-25T22:40:00"),
-    focusElements: [
-      {
-        startTimestamp: new Date("2026-04-25T21:10:00"),
-        endTimestamp: new Date("2026-04-25T21:16:00"),
-        focusType: "focus",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T21:16:00"),
-        endTimestamp: new Date("2026-04-25T21:34:00"),
-        focusType: "distracted",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T21:34:00"),
-        endTimestamp: new Date("2026-04-25T21:48:00"),
-        focusType: "break",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T21:48:00"),
-        endTimestamp: new Date("2026-04-25T22:17:00"),
-        focusType: "distracted",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T22:17:00"),
-        endTimestamp: new Date("2026-04-25T22:28:00"),
-        focusType: "break",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T22:28:00"),
-        endTimestamp: new Date("2026-04-25T22:40:00"),
-        focusType: "distracted",
-      },
-    ],
-    appElements: [
-      {
-        startTimestamp: new Date("2026-04-25T21:10:00"),
-        endTimestamp: new Date("2026-04-25T21:16:00"),
-        activityName: "Reading outline",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T21:16:00"),
-        endTimestamp: new Date("2026-04-25T21:25:00"),
-        activityName: "Short videos",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T21:25:00"),
-        endTimestamp: new Date("2026-04-25T21:34:00"),
-        activityName: "Group chat",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T21:34:00"),
-        endTimestamp: new Date("2026-04-25T21:48:00"),
-        activityName: "Break",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T21:48:00"),
-        endTimestamp: new Date("2026-04-25T22:06:00"),
-        activityName: "Social media",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T22:06:00"),
-        endTimestamp: new Date("2026-04-25T22:17:00"),
-        activityName: "Online shopping",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T22:17:00"),
-        endTimestamp: new Date("2026-04-25T22:28:00"),
-        activityName: "Break",
-      },
-      {
-        startTimestamp: new Date("2026-04-25T22:28:00"),
-        endTimestamp: new Date("2026-04-25T22:40:00"),
-        activityName: "Messages",
-      },
-    ],
-    idleTimeSeconds: 1140,
-  },
-];
+import { MOCK_SESSIONS } from "../lib/mockSessions";
+import { loadLocalSessions } from "../lib/localSessions";
+import {
+  computeAverageMetrics,
+  computeSessionMetrics,
+  computeSessionDayStreak,
+  filterSessionsForCurrentWeek,
+  formatWeekRange,
+  getCurrentWeekBounds,
+  secondsBetween,
+} from "../lib/sessionStats";
 
 export default function FeedSection({
   openBlockers,
 }: {
   openBlockers: () => void;
 }) {
+  const [sessions, setSessions] = useState<SessionData[]>(MOCK_SESSIONS);
   const [subject, setSubject] = useState("Organic Chem");
   const [duration, setDuration] = useState("50");
   const [breakTime, setBreakTime] = useState("10");
 
+  useEffect(() => {
+    let alive = true;
+
+    loadLocalSessions()
+      .then((nextSessions) => {
+        if (alive) {
+          setSessions(nextSessions);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load sessions", error);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const selectClass =
     "text-sm border border-gray-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-orange-400";
+
+  const weeklySessions = filterSessionsForCurrentWeek(sessions);
+  const averageMetrics = computeAverageMetrics(weeklySessions);
+  const weeklyFocusMinutes = Math.round(
+    weeklySessions.reduce((sum, session) => {
+      const totalSeconds = secondsBetween(session.startTimestamp, session.endTimestamp);
+      const metrics = computeSessionMetrics(session);
+      return sum + (totalSeconds * metrics.productivityRate) / 100 / 60;
+    }, 0)
+  );
+  const longestWeeklyStreak = computeSessionDayStreak(weeklySessions);
+  const weeklySnapshot = [
+    { label: "Focus minutes", value: `${weeklyFocusMinutes}`, delta: "week" },
+    { label: "Sessions", value: `${weeklySessions.length}`, delta: "count" },
+    { label: "Avg Focus", value: `${averageMetrics.focus}%`, delta: "avg" },
+    { label: "Longest streak", value: `${longestWeeklyStreak} days`, delta: "best" },
+  ];
+  const { start: weekStart, end: weekEnd } = getCurrentWeekBounds();
+  const weekRange = formatWeekRange(weekStart, weekEnd);
 
   return (
     <main className="flex-1 flex flex-col gap-4 min-w-0">
@@ -305,6 +128,27 @@ export default function FeedSection({
         >
           Start lock-in
         </button>
+
+        <section className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-semibold tracking-wide text-gray-700 uppercase">
+              Weekly snapshot
+            </p>
+            <p className="text-[11px] text-gray-500">{weekRange}</p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {weeklySnapshot.map(({ label, value, delta }) => (
+              <div key={label} className="rounded-md bg-white border border-orange-100 px-2 py-1.5">
+                <p className="text-[10px] uppercase tracking-wide text-gray-500">{label}</p>
+                <div className="flex items-end justify-between gap-2">
+                  <p className="text-sm font-semibold text-gray-900">{value}</p>
+                  <span className="text-[10px] font-semibold text-orange-700">{delta}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
 
       {/* Feed posts */}

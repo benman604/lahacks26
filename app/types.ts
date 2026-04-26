@@ -40,6 +40,31 @@ export type SessionData = {
 	focusElements: FocusElement[];
 	appElements: AppElement[];
 	idleTimeSeconds: number;
+	summaryMetrics?: SessionMetrics;
+	timelineSummary?: SessionTimelineSummary;
+}
+
+export type SessionMetrics = {
+	productivityRate: number;
+	distractionRecoveryTime: number;
+	adherenceToBreakTime: number;
+	chaosScore: number;
+	idleRatio: number;
+}
+
+export type FocusTimelineSummarySegment = {
+	focusType: "focus" | "distracted" | "break";
+	widthPct: number;
+}
+
+export type AppTimelineSummarySegment = {
+	activityName: string;
+	widthPct: number;
+}
+
+export type SessionTimelineSummary = {
+	focusSegments: FocusTimelineSummarySegment[];
+	appSegments: AppTimelineSummarySegment[];
 }
 
 // Define a function Adherence(average, ideal) that outputs a score from 0-100 based on the formula above

@@ -70,6 +70,26 @@ function formatRange(start: Date, end: Date) {
   return `${formatTime(start)} – ${formatTime(end)}`;
 }
 
+function formatSessionDateLabel(date: Date) {
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (target.getTime() === today.getTime()) return "Today";
+  if (target.getTime() === yesterday.getTime()) return "Yesterday";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(target);
+}
+
 function clampPercent(value: number) {
   return Math.max(0, Math.min(100, value));
 }
@@ -122,6 +142,22 @@ function computeSessionSummary(
   session: SessionData,
   username: string,
 ): SessionSummary {
+  if (session.summaryMetrics) {
+    return {
+      username,
+      title: session.title,
+      startTimestamp: session.startTimestamp,
+      endTimestamp: session.endTimestamp,
+      focusElements: session.focusElements,
+      appElements: session.appElements,
+      productivityRate: session.summaryMetrics.productivityRate,
+      distractionRecoveryTime: session.summaryMetrics.distractionRecoveryTime,
+      adherenceToBreakTime: session.summaryMetrics.adherenceToBreakTime,
+      chaosScore: session.summaryMetrics.chaosScore,
+      idleRatio: session.summaryMetrics.idleRatio,
+    };
+  }
+
   const totalSeconds = secondsBetween(session.startTimestamp, session.endTimestamp);
 
   const focusSeconds = session.focusElements
@@ -358,6 +394,7 @@ export default function SessionSummaryCard({
   username = "You",
 }: Props) {
   const summary = computeSessionSummary(session, username);
+  const sessionDateLabel = formatSessionDateLabel(summary.startTimestamp);
   const roundedProductivity = Math.round(summary.productivityRate);
   const isFocusedRed = roundedProductivity <= 69;
   const isFocusedYellow = roundedProductivity >= 70 && roundedProductivity <= 89;
@@ -369,23 +406,40 @@ export default function SessionSummaryCard({
   const focusBadgeText = isFocusedYellow ? "#111827" : "#ffffff";
 
   const totalSeconds = secondsBetween(summary.startTimestamp, summary.endTimestamp);
+  const compactTimeline = session.timelineSummary;
 
-  const focusTimeline = summary.focusElements.map((el) => {
-    const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
+  const focusTimeline =
+    summary.focusElements.length > 0
+      ? summary.focusElements.map((el) => {
+          const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
 
-    const color =
-      el.focusType === "focus"
-        ? "#87ae73"
-        : el.focusType === "break"
-          ? "#4f8bc3"
-          : "#b0a4d6";
+          const color =
+            el.focusType === "focus"
+              ? "#87ae73"
+              : el.focusType === "break"
+                ? "#4f8bc3"
+                : "#b0a4d6";
 
-    return {
-      width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
-      color,
-      tooltip: `${el.focusType} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
-    };
-  });
+          return {
+            width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
+            color,
+            tooltip: `${el.focusType} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
+          };
+        })
+      : (compactTimeline?.focusSegments ?? []).map((segment) => {
+          const color =
+            segment.focusType === "focus"
+              ? "#87ae73"
+              : segment.focusType === "break"
+                ? "#4f8bc3"
+                : "#b0a4d6";
+
+          return {
+            width: segment.widthPct,
+            color,
+            tooltip: `${segment.focusType} · ${Math.round(segment.widthPct)}%`,
+          };
+        });
 
   const basePalette = ["#904c77", "#e49ab0", "#ecb8a5", "#eccfc3", "#957d95"];
   const tintPalette = basePalette.map((c) => mixHex(c, "#ffffff", 0.28));
@@ -393,38 +447,55 @@ export default function SessionSummaryCard({
   const appPalette = [...basePalette, ...tintPalette, ...shadePalette];
 
   // Create app timeline segments, assigning colors based on activity name
-  const createAppTimeline = (appElements: SessionData["appElements"]) => {
+  const createAppTimeline = (
+    appElements: SessionData["appElements"],
+    compactSegments: Array<{ activityName: string; widthPct: number }>
+  ) => {
       const activityColors = new Map<string, string>();
       let nextColorIndex = 0;
 
-      const appTimeline = summary.appElements.map((el) => {
-        const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
+      const source =
+        appElements.length > 0
+          ? appElements.map((el) => {
+              const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
+              return {
+                activityName: el.activityName,
+                width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
+                tooltip: `${el.activityName} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
+              };
+            })
+          : compactSegments.map((segment) => ({
+              activityName: segment.activityName,
+              width: segment.widthPct,
+              tooltip: `${segment.activityName} · ${Math.round(segment.widthPct)}%`,
+            }));
 
-        let backgroundColor = activityColors.get(el.activityName);
+      const appTimeline = source.map((item) => {
+        let backgroundColor = activityColors.get(item.activityName);
         if (!backgroundColor) {
           backgroundColor = appPalette[nextColorIndex % appPalette.length];
-          activityColors.set(el.activityName, backgroundColor);
+          activityColors.set(item.activityName, backgroundColor);
           nextColorIndex += 1;
         }
 
         return {
-          width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
+          width: item.width,
           backgroundColor,
-          tooltip: `${el.activityName} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
+          tooltip: item.tooltip,
         };
       });
 
       return appTimeline;
   }
 
-  const appTimeline = createAppTimeline(summary.appElements);
+  const appTimeline = createAppTimeline(summary.appElements, compactTimeline?.appSegments ?? []);
 
   return (
     <article className="bg-white border border-gray-200 rounded-xl px-5 py-4 flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs text-gray-500">
-            {summary.username} · {formatRange(summary.startTimestamp, summary.endTimestamp)}
+            {summary.username} · {sessionDateLabel} · {formatRange(summary.startTimestamp, summary.endTimestamp)}
           </p>
           <h2 className="font-semibold text-xl mt-0.5">{summary.title}</h2>
         </div>
