@@ -157,7 +157,7 @@ function buildSession(session: RawSessionData): SessionData {
   return {
     userId: "you",
     title: session.title,
-    idealBreakTimeMinutes: session.idealBreakTimeMinutes,
+    totalBreakTimeMinutes: session.totalBreakTimeMinutes,
     startTimestamp: start,
     endTimestamp: end,
     focusElements,
@@ -172,8 +172,8 @@ export default function SessionSummary({ session, onNext }: Props) {
   function next() {
     createSession(builtSession).then((e) => {
       console.log("Session saved with ID", e);
+      onNext();
     });
-    onNext();
   }
 
   return (

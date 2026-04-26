@@ -8,34 +8,99 @@ import LeftSidebar from "./components/LeftSidebar";
 import FeedSection, { type FeedPost } from "./components/FeedSection";
 import SessionSummary from "./components/SessionSummary";
 import RightSidebar from "./components/RightSidebar";
-import { type RawSessionData } from "./types";
-import { app } from "../lib/firebase";
+import { SessionData, type FocusType, type RawSessionData } from "./types";
+import { db } from "../lib/db";
+import { collection, getDocs } from "firebase/firestore";
 
-const posts: FeedPost[] = [
-  {
-    id: 1,
-    initials: "B",
-    color: "#3A6B9E",
-    name: "Ben M.",
-    date: "April 26, 2026 · 5:49 PM",
-    title: "Afternoon Study — Organic Chem",
-    kudos: 12,
-    comments: [
-      { initials: "M", color: "#7B5EA7", name: "Maya K.", text: "this is huge — keep going!" },
-      { initials: "J", color: "#3A7D44", name: "Jordan T.", text: "the 90-min stretch is unreal!" },
-    ],
-  },
-  {
-    id: 2,
-    initials: "E",
-    color: "#BF4800",
-    name: "Esther E.",
-    date: "April 25, 2026 · 11:02 AM",
-    title: "Morning Focus — Linear Algebra",
-    kudos: 5,
-    comments: [],
-  },
-];
+type TimestampLike = {
+  toDate?: () => Date;
+  seconds?: number;
+  nanoseconds?: number;
+};
+
+type SessionDataWire = Partial<Omit<SessionData, "startTimestamp" | "endTimestamp" | "focusElements" | "appElements">> & {
+  startTimestamp?: unknown;
+  endTimestamp?: unknown;
+  focusElements?: Array<{
+    startTimestamp?: unknown;
+    endTimestamp?: unknown;
+    focusType?: unknown;
+  }>;
+  appElements?: Array<{
+    startTimestamp?: unknown;
+    endTimestamp?: unknown;
+    activityName?: unknown;
+  }>;
+};
+
+const sessions: SessionData[] = [];
+
+function toDateFromFirestore(value: unknown, fallback: Date) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value === "string" || typeof value === "number") {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+
+  const timestamp = value as TimestampLike;
+  if (timestamp && typeof timestamp.toDate === "function") {
+    const d = timestamp.toDate();
+    if (d instanceof Date && !Number.isNaN(d.getTime())) return d;
+  }
+  if (timestamp && typeof timestamp.seconds === "number") {
+    const ms = timestamp.seconds * 1000 + (timestamp.nanoseconds ?? 0) / 1_000_000;
+    const d = new Date(ms);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+
+  return fallback;
+}
+
+function normalizeSessionDataFromFirestore(payload: SessionDataWire): SessionData {
+  const now = new Date();
+  const startTimestamp = toDateFromFirestore(payload.startTimestamp, now);
+  const endTimestamp = toDateFromFirestore(payload.endTimestamp, startTimestamp);
+
+  const focusElements = Array.isArray(payload.focusElements)
+    ? payload.focusElements.map((entry) => ({
+        startTimestamp: toDateFromFirestore(entry.startTimestamp, startTimestamp),
+        endTimestamp: toDateFromFirestore(entry.endTimestamp, endTimestamp),
+        focusType: normalizeFocusType(entry.focusType),
+      }))
+    : [];
+
+  const appElements = Array.isArray(payload.appElements)
+    ? payload.appElements.map((entry) => ({
+        startTimestamp: toDateFromFirestore(entry.startTimestamp, startTimestamp),
+        endTimestamp: toDateFromFirestore(entry.endTimestamp, endTimestamp),
+        activityName: typeof entry.activityName === "string" ? entry.activityName : "unknown",
+      }))
+    : [];
+
+  return {
+    userId: typeof payload.userId === "string" ? payload.userId : "unknown",
+    title: typeof payload.title === "string" ? payload.title : "Session",
+    totalBreakTimeMinutes:
+      typeof payload.totalBreakTimeMinutes === "number" ? payload.totalBreakTimeMinutes : 0,
+    startTimestamp,
+    endTimestamp,
+    focusElements,
+    appElements,
+    idleTimeSeconds: typeof payload.idleTimeSeconds === "number" ? payload.idleTimeSeconds : 0,
+  };
+}
+
+function normalizeFocusType(value: unknown): FocusType {
+  if (
+    value === "productive" ||
+    value === "supportive" ||
+    value === "neutral" ||
+    value === "break"
+  ) {
+    return value;
+  }
+  return "neutral";
+}
 
 function deriveSubjectFromTitle(title: string) {
   const parts = title.split("—");
@@ -58,9 +123,10 @@ type ScreenshotDataWire = {
 type RawSessionDataWire = {
   title?: unknown;
   subject?: unknown;
-  idealBreakTimeMinutes?: unknown;
+  totalBreakTimeMinutes?: unknown;
   startTimestamp?: unknown;
   endTimestamp?: unknown;
+  distractionCount?: unknown;
   data?: unknown;
 };
 
@@ -90,10 +156,8 @@ function normalizeRawSessionData(payload: RawSessionDataWire): RawSessionData {
   const data: RawSessionData["data"] = Array.isArray(payload.data)
     ? payload.data.map((entry) => {
         const wire = entry as ScreenshotDataWire;
-        const focusType: RawSessionData["data"][number]["focusType"] =
-          wire.focusType === "focus" || wire.focusType === "distracted" || wire.focusType === "break"
-            ? wire.focusType
-            : "focus";
+        // @ts-expect-error because data from wire is not typed
+        const focusType: RawSessionData["data"][number]["focusType"] = wire.focusType as string;
 
         return {
           timestamp: toDate(wire.timestamp, now),
@@ -106,17 +170,35 @@ function normalizeRawSessionData(payload: RawSessionDataWire): RawSessionData {
 
   return {
     title: typeof payload.title === "string" ? payload.title : "Session",
-    subject: typeof payload.subject === "string" ? payload.subject : "",
-    idealBreakTimeMinutes: toPositiveNumber(payload.idealBreakTimeMinutes, 10),
+    totalBreakTimeMinutes: toPositiveNumber(payload.totalBreakTimeMinutes, 10),
     startTimestamp,
     endTimestamp,
+    distractionCount: typeof payload.distractionCount === "number" ? payload.distractionCount : 0,
     data,
   };
 }
 
 export default function Home() {
-  const latestRawSessionDataRef = useRef<RawSessionData | null>(null);
-  const [sessionSummaryData, setSessionSummaryData] = useState<RawSessionData | null>(null);
+  const latestRawSessionDataRef = React.useRef<RawSessionData | null>(null);
+  const [sessionSummaryData, setSessionSummaryData] = React.useState<RawSessionData | null>(null);
+  const [allSessions, setAllSessions] = React.useState<SessionData[]>(sessions);
+
+  const fetchSessions = React.useCallback(async () => {
+    try {
+      const snapshot = await getDocs(collection(db, "p2p2"));
+      const fetchedSessions = snapshot.docs
+        .map((doc) => normalizeSessionDataFromFirestore(doc.data() as SessionDataWire))
+        .sort((a, b) => b.startTimestamp.getTime() - a.startTimestamp.getTime());
+
+      setAllSessions(fetchedSessions);
+    } catch (e) {
+      console.error("failed to load sessions", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
 
   useEffect(() => {
     const unlistenPromise = listen("session-window-ready", async () => {
@@ -148,30 +230,19 @@ export default function Home() {
     };
   }, []);
 
-  const [highlightedPostId, setHighlightedPostId] = useState<number | null>(posts[0]?.id ?? null);
-  const highlightedPost = useMemo(
-    () => posts.find((p) => p.id === highlightedPostId) ?? null,
-    [highlightedPostId]
-  );
-
-  const [subject, setSubject] = useState(() => {
-    const initial = posts[0]?.title ? deriveSubjectFromTitle(posts[0].title) : "";
-    return initial || "Organic Chem";
-  });
-  const [breakTime, setBreakTime] = useState("10");
+  const [subject, setSubject] = React.useState<string>("Organic Chem");
+  const [breakTime, setBreakTime] = React.useState<string>("10");
 
   function buildRawSessionData(): RawSessionData {
-    const idealBreakTimeMinutes = parsePositiveInt(breakTime, 10);
+    const totalBreakTimeMinutes = parsePositiveInt(breakTime, 10);
     const startTimestamp = new Date();
-    const cleanSubject = subject.trim() || (highlightedPost ? deriveSubjectFromTitle(highlightedPost.title) : "");
-    const sessionTitle = cleanSubject || highlightedPost?.title || "Session";
 
     return {
-      title: sessionTitle,
-      subject: cleanSubject || "",
-      idealBreakTimeMinutes,
+      title: subject,
+      totalBreakTimeMinutes,
       startTimestamp,
       endTimestamp: startTimestamp,
+      distractionCount: 0,
       data: [],
     };
   }
@@ -230,7 +301,10 @@ export default function Home() {
     return (
       <SessionSummary
         session={sessionSummaryData}
-        onNext={() => setSessionSummaryData(null)}
+        onNext={async () => {
+          await fetchSessions();
+          setSessionSummaryData(null);
+        }}
       />
     );
   }
@@ -241,10 +315,10 @@ export default function Home() {
 
   return (
     <div className="flex gap-8 max-w-7xl mx-auto w-full px-6 py-8">
-      <div className="hidden lg:block"><LeftSidebar /></div>
+      <div className="hidden lg:block"><LeftSidebar sessions={allSessions} /></div>
       <main className="flex-1 flex flex-col gap-4 min-w-0">
         {/* Start lock-in bar */}
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-col gap-3">
+        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
           <div className="flex gap-3 items-end">
             <div className="flex flex-col gap-0.5">
               <label className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
@@ -255,7 +329,7 @@ export default function Home() {
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="e.g. Organic Chem"
-                className={`${selectClass} w-full`}
+                className={selectClass}
               />
             </div>
 
@@ -271,28 +345,24 @@ export default function Home() {
                   value={breakTime}
                   onChange={(e) => setBreakTime(e.target.value.replace(/\D/g, ""))}
                   placeholder="10"
-                  className={`${selectClass} w-full`}
+                  className={`${selectClass} w-20`}
                 />
                 <span className="text-xs text-gray-400 shrink-0">min</span>
               </div>
             </div>
-          </div>
 
-          <button
-            onClick={() => openSession(buildRawSessionData())}
-            className="col-span-2 py-2 rounded-lg text-white text-sm font-semibold hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: "var(--p2p-accent)" }}
-          >
-            Start lock-in
-          </button>
+            <button
+              onClick={() => openSession(buildRawSessionData())}
+              className="flex-1 py-1.5 rounded-lg text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+              style={{ backgroundColor: "var(--p2p-accent)" }}
+            >
+              Start lock-in
+            </button>
+          </div>
         </div>
 
         <FeedSection
-          posts={posts}
-          highlightedPostId={highlightedPostId}
-          onHighlightPostId={(postId) => {
-            setHighlightedPostId(postId);
-          }}
+          sessions={allSessions}
         />
       </main>
       <div className="hidden lg:block"><RightSidebar /></div>

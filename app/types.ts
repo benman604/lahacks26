@@ -16,7 +16,7 @@ export type AppElement = {
 	activityName: string;
 }
 
-export type FocusType = "productive" | "supportive" | "neutral" | "distracted" | "break";
+export type FocusType = "productive" | "supportive" | "neutral" | "break";
 
 export type ScreenshotData = {
 	timestamp: Date;
@@ -30,17 +30,17 @@ export type ScreenshotData = {
 
 export type RawSessionData = {
 	title: string;
-	subject: string;
-	idealBreakTimeMinutes: number;
+	totalBreakTimeMinutes: number;
 	startTimestamp: Date;
 	endTimestamp: Date;
+	distractionCount: number;
 	data: ScreenshotData[];
 }
 
 export type SessionData = {
 	userId: string;
 	title: string;
-	idealBreakTimeMinutes: number;
+	totalBreakTimeMinutes: number;
 	startTimestamp: Date;
 	endTimestamp: Date;
 	focusElements: FocusElement[];
@@ -64,8 +64,18 @@ export type SessionSummary = {
 	// Adherence(average break time, ideal break time)
 	adherenceToBreakTime: number;
 	// Use Shannon entropy over all activities in the session (divided by log(# of activities) to normalize) and then multiplied by 100 to get a score from 0-100
-	chaosScore: number;
+	flowScore: number;
 	// (Idle Time) / (Total Time)
 	idleRatio: number;
 }
+
+export type SessionMetrics = {
+	productivityRate: number;
+	distractionRecoveryTime: number;
+	adherenceToBreakTime: number;
+	flowScore: number;
+	idleRatio: number;
+}
+
+export type SessionStats = SessionMetrics;
 

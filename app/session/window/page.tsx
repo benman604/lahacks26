@@ -17,7 +17,7 @@ const ANALYSIS_INTERVAL_MS = 100 * 1000; // analyze every 40 seconds
 type RawSessionDataWire = {
   title?: unknown;
   subject?: unknown;
-  idealBreakTimeMinutes?: unknown;
+  totalBreakTimeMinutes?: unknown;
   startTimestamp?: unknown;
   endTimestamp?: unknown;
   data?: unknown;
@@ -55,6 +55,7 @@ export default function SessionWindow() {
   const [breakSecondsLeft, setBreakSecondsLeft] = useState<number>(0);
   const breakTimerRef = useRef<number | null>(null);
   const breakInitializedRef = useRef(false);
+  const distractionCountRef = useRef(0);
 
   // stable refs so static event handlers always call the latest version
   const rawSessionDataRef = useRef<RawSessionData | null>(null);
@@ -120,7 +121,7 @@ export default function SessionWindow() {
       setRawSessionData({
         title: typeof incoming.title === "string" ? incoming.title : "Session",
         subject: typeof incoming.subject === "string" ? incoming.subject : "",
-        idealBreakTimeMinutes: toPositiveNumber(incoming.idealBreakTimeMinutes, 10),
+        totalBreakTimeMinutes: toPositiveNumber(incoming.totalBreakTimeMinutes, 10),
         startTimestamp,
         endTimestamp,
         data: Array.isArray(incoming.data) ? (incoming.data as ScreenshotData[]) : [],
@@ -176,6 +177,7 @@ export default function SessionWindow() {
       appendHistory(entry);
 
       if (data.focusType === "distracted") {
+        distractionCountRef.current += 1;
         const instruction =
           typeof data.instructOffDistraction === "string" ? data.instructOffDistraction : undefined;
         await openBlockers(instruction);
@@ -192,10 +194,18 @@ export default function SessionWindow() {
   // initialize break budget once when session data first arrives
   useEffect(() => {
     if (rawSessionData && !breakInitializedRef.current) {
-      setBreakSecondsLeft(rawSessionData.idealBreakTimeMinutes * 60);
+      setBreakSecondsLeft(rawSessionData.totalBreakTimeMinutes * 60);
       breakInitializedRef.current = true;
     }
   }, [rawSessionData]);
+
+  // when break timer hits 0, end the break and re-block
+  useEffect(() => {
+    if (onBreak && breakSecondsLeft <= 0) {
+      endBreak();
+      openBlockers();
+    }
+  }, [breakSecondsLeft, onBreak]);
 
   useEffect(() => {
     const unlistenTrigger = listen("trigger-blockers", async () => {
@@ -210,6 +220,11 @@ export default function SessionWindow() {
       await closeBlockers();
       stopTimer();
       setOnBreak(true);
+      setHistory((prev) => {
+        const next = [...prev, { timestamp: new Date(), focusType: "break" as const, websiteOrApp: "Break", isIdle: false }];
+        historyRef.current = next;
+        return next;
+      });
       if (breakTimerRef.current) clearInterval(breakTimerRef.current);
       breakTimerRef.current = window.setInterval(() => {
         setBreakSecondsLeft((s) => s - 1);
@@ -338,6 +353,7 @@ export default function SessionWindow() {
   function startBreak() {
     stopTimer();
     setOnBreak(true);
+    appendHistory({ timestamp: new Date(), focusType: "break", websiteOrApp: "Break", isIdle: false });
     if (breakTimerRef.current) clearInterval(breakTimerRef.current);
     breakTimerRef.current = window.setInterval(() => {
       setBreakSecondsLeft((s) => s - 1);
@@ -350,6 +366,7 @@ export default function SessionWindow() {
       breakTimerRef.current = null;
     }
     setOnBreak(false);
+    appendHistory({ timestamp: new Date(), focusType: "break", websiteOrApp: "Break", isIdle: false });
     // breakSecondsLeft is intentionally NOT reset — preserves remaining balance
     startTimer();
   }
@@ -370,6 +387,7 @@ export default function SessionWindow() {
     const sessionEndPayload: RawSessionData = {
       ...rawSessionData,
       endTimestamp: new Date(),
+      distractionCount: distractionCountRef.current,
       data: historyRef.current.slice(),
     };
 

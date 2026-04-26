@@ -2,62 +2,17 @@
 
 import type { CSSProperties } from "react";
 import type { SessionData, SessionSummary } from "../types";
+import {
+  clampPercent,
+  computeProductivityScore,
+  computeSessionSummary,
+  secondsBetween,
+} from "../lib/sessionStats";
 
 type Props = {
   session: SessionData;
   username?: string;
 };
-
-function sigmoid(x: number, center: number, a: number): number {
-  return 1 / (1 + Math.exp(a * (x - center)));
-}
-
-function standardSigmoid(z: number): number {
-  // Convert to the standard logistic sigmoid: 1 / (1 + e^-z)
-  // using the existing (decreasing) sigmoid implementation.
-  return sigmoid(-z, 0, 1);
-}
-
-function calculateDistractionScore(
-  average: number,
-  beta: number = 30,
-): number {
-
-  const alpha: number = 10/beta; // Steepness parameter, scaled based on the desired recovery time
-
-  // Piece 1: 0 <= x <= T
-  if (average >= 0 && average <= beta) {
-    const z = -alpha * (average - 0.5 * beta);
-    return 0.5 * standardSigmoid(z) + 0.5;
-  }
-
-  // Piece 2: T <= x
-  if (average > beta) {
-    const z = -alpha * (average - 1.5 * beta);
-    return 0.5 * standardSigmoid(z);
-  }
-
-  return 0;
-}
-
-function adherence(average: number, ideal: number): number {
-  const alpha: number = 10/ideal; // Steepness parameter, scaled based on the ideal time
-  if (average < ideal) return 1;
-
-  if (average >= ideal && average <= 2 * ideal) {
-    return 0.5 * sigmoid(average, 1.5 * ideal, alpha) + 0.5;
-  }
-
-  if (average > 2 * ideal) {
-    return 0.5 * sigmoid(average, 2.5 * ideal, alpha);
-  }
-
-  return 0;
-}
-
-function secondsBetween(start: Date, end: Date) {
-  return Math.max(0, (new Date(end).getTime() - new Date(start).getTime()) / 1000);
-}
 
 function formatTime(date: Date) {
   return new Intl.DateTimeFormat("en-US", {
@@ -70,90 +25,31 @@ function formatRange(start: Date, end: Date) {
   return `${formatTime(start)} – ${formatTime(end)}`;
 }
 
-function clampPercent(value: number) {
-  return Math.max(0, Math.min(100, value));
+function formatSessionDateLabel(date: Date) {
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (target.getTime() === today.getTime()) return "Today";
+  if (target.getTime() === yesterday.getTime()) return "Yesterday";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(target);
 }
 
-function computeAverageDurationMinutes<T extends { startTimestamp: Date; endTimestamp: Date }>(
-  elements: T[]
-) {
-  if (elements.length === 0) return 0;
-
-  const totalSeconds = elements.reduce(
-    (sum, el) => sum + secondsBetween(el.startTimestamp, el.endTimestamp),
-    0
-  );
-
-  return totalSeconds / elements.length / 60;
-}
-
-function computeChaosScore(appElements: SessionData["appElements"]) {
-  const totalSeconds = appElements.reduce(
-    (sum, el) => sum + secondsBetween(el.startTimestamp, el.endTimestamp),
-    0
-  );
-
-  if (totalSeconds <= 0) return 0;
-
-  const byActivity = new Map<string, number>();
-
-  for (const el of appElements) {
-    byActivity.set(
-      el.activityName,
-      (byActivity.get(el.activityName) ?? 0) +
-        secondsBetween(el.startTimestamp, el.endTimestamp)
-    );
-  }
-
-  const activityCount = byActivity.size;
-  if (activityCount <= 1) return 0;
-
-  const entropy = [...byActivity.values()].reduce((sum, seconds) => {
-    const p = seconds / totalSeconds;
-    return p > 0 ? sum - p * Math.log(p) : sum;
-  }, 0);
-
-  const normalizedEntropy = entropy / Math.log(activityCount);
-  const softenedEntropy = Math.pow(normalizedEntropy, 1.35);
-
-  return clampPercent(softenedEntropy * 100);
-}
-
-function computeSessionSummary(
-  session: SessionData,
-  username: string,
-): SessionSummary {
-  const totalSeconds = secondsBetween(session.startTimestamp, session.endTimestamp);
-
-  const focusSeconds = session.focusElements
-    .filter((el) => el.focusType === "focus")
-    .reduce((sum, el) => sum + secondsBetween(el.startTimestamp, el.endTimestamp), 0);
-
-  const distractionElements = session.focusElements.filter(
-    (el) => el.focusType === "distracted"
-  );
-
-  const breakElements = session.focusElements.filter((el) => el.focusType === "break");
-
-  const averageDistractionMinutes =
-    computeAverageDurationMinutes(distractionElements);
-
-  const averageBreakMinutes = computeAverageDurationMinutes(breakElements);
-
-  return {
-    username,
-    title: session.title,
-    startTimestamp: session.startTimestamp,
-    endTimestamp: session.endTimestamp,
-    focusElements: session.focusElements,
-    appElements: session.appElements,
-    productivityRate: totalSeconds > 0 ? clampPercent((focusSeconds / totalSeconds) * 100) : 0,
-    distractionRecoveryTime: calculateDistractionScore(averageDistractionMinutes, 30) * 100,
-    adherenceToBreakTime:
-      adherence(averageBreakMinutes, session.idealBreakTimeMinutes) * 100,
-    chaosScore: computeChaosScore(session.appElements),
-    idleRatio: totalSeconds > 0 ? clampPercent((session.idleTimeSeconds / totalSeconds) * 100) : 0,
-  };
+function getTrafficLightColor(score: number) {
+  const rounded = Math.round(clampPercent(score));
+  if (rounded <= 69) return "#dc2626";
+  if (rounded <= 89) return "#facc15";
+  return "#16a34a";
 }
 
 function TimelineSegment({
@@ -210,6 +106,7 @@ function StatPill({ label, value }: { label: string; value: number }) {
   const circumference = 2 * Math.PI * radius;
   const progress = clampPercent(value);
   const dashOffset = circumference * (1 - progress / 100);
+  const ringColor = getTrafficLightColor(progress);
 
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-center flex min-h-16 flex-col items-center justify-center">
@@ -231,7 +128,7 @@ function StatPill({ label, value }: { label: string; value: number }) {
             cy="32"
             r={radius}
             fill="none"
-            stroke="var(--p2p-accent)"
+            stroke={ringColor}
             strokeWidth="6"
             strokeLinecap="round"
             strokeDasharray={circumference}
@@ -250,9 +147,9 @@ function RadarChart({ summary }: { summary: SessionSummary }) {
   const stats = [
     { label: "Focus", value: summary.productivityRate },
     { label: "Recovery", value: summary.distractionRecoveryTime },
-    { label: "Breaks", value: summary.adherenceToBreakTime },
-    { label: "Chaos", value: summary.chaosScore },
-    { label: "Ponder", value: 100 - summary.idleRatio },
+    { label: "Discipline", value: summary.adherenceToBreakTime },
+    { label: "Flow", value: summary.flowScore },
+    { label: "Activity", value: 100 - summary.idleRatio },
   ];
 
   const center = 110;
@@ -358,35 +255,39 @@ export default function SessionSummaryCard({
   session,
   username = "You",
 }: Props) {
-  const summary = computeSessionSummary(session, username);
-  const roundedProductivity = Math.round(summary.productivityRate);
-  const isFocusedRed = roundedProductivity <= 69;
+  const summary = computeSessionSummary(session);
+  const sessionDateLabel = formatSessionDateLabel(summary.startTimestamp);
+  const roundedProductivity = computeProductivityScore({
+    productivityRate: summary.productivityRate,
+    distractionRecoveryTime: summary.distractionRecoveryTime,
+    adherenceToBreakTime: summary.adherenceToBreakTime,
+    flowScore: summary.flowScore,
+    idleRatio: summary.idleRatio,
+  });
+  const focusBadgeBackground = getTrafficLightColor(roundedProductivity);
   const isFocusedYellow = roundedProductivity >= 70 && roundedProductivity <= 89;
-  const focusBadgeBackground = isFocusedRed
-    ? "#dc2626"
-    : isFocusedYellow
-      ? "#facc15"
-      : "#16a34a";
   const focusBadgeText = isFocusedYellow ? "#111827" : "#ffffff";
 
   const totalSeconds = secondsBetween(summary.startTimestamp, summary.endTimestamp);
 
   const focusTimeline = summary.focusElements.map((el) => {
-    const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
+          const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
+          
+          const color =
+            el.focusType === "productive"
+              ? "#87ae73"
+              : el.focusType === "supportive"
+                ? "#4f8bc3"
+                : el.focusType === "neutral"
+                  ? "#b0a4d6"
+                  : "#e5e7eb";
 
-    const color =
-      el.focusType === "focus"
-        ? "#87ae73"
-        : el.focusType === "break"
-          ? "#4f8bc3"
-          : "#b0a4d6";
-
-    return {
-      width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
-      color,
-      tooltip: `${el.focusType} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
-    };
-  });
+          return {
+            width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
+            color,
+            tooltip: `${el.focusType} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
+          };
+        })
 
   const basePalette = ["#904c77", "#e49ab0", "#ecb8a5", "#eccfc3", "#957d95"];
   const tintPalette = basePalette.map((c) => mixHex(c, "#ffffff", 0.28));
@@ -394,24 +295,33 @@ export default function SessionSummaryCard({
   const appPalette = [...basePalette, ...tintPalette, ...shadePalette];
 
   // Create app timeline segments, assigning colors based on activity name
-  const createAppTimeline = (appElements: SessionData["appElements"]) => {
+  const createAppTimeline = (
+    appElements: SessionData["appElements"],
+  ) => {
       const activityColors = new Map<string, string>();
       let nextColorIndex = 0;
 
-      const appTimeline = summary.appElements.map((el) => {
-        const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
+      const source = appElements.map((el) => {
+              const seconds = secondsBetween(el.startTimestamp, el.endTimestamp);
+              return {
+                activityName: el.activityName,
+                width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
+                tooltip: `${el.activityName} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
+              };
+            })
 
-        let backgroundColor = activityColors.get(el.activityName);
+      const appTimeline = source.map((item) => {
+        let backgroundColor = activityColors.get(item.activityName);
         if (!backgroundColor) {
           backgroundColor = appPalette[nextColorIndex % appPalette.length];
-          activityColors.set(el.activityName, backgroundColor);
+          activityColors.set(item.activityName, backgroundColor);
           nextColorIndex += 1;
         }
 
         return {
-          width: totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0,
+          width: item.width,
           backgroundColor,
-          tooltip: `${el.activityName} · ${formatRange(el.startTimestamp, el.endTimestamp)}`,
+          tooltip: item.tooltip,
         };
       });
 
@@ -425,7 +335,7 @@ export default function SessionSummaryCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs text-gray-500">
-            {summary.username} · {formatRange(summary.startTimestamp, summary.endTimestamp)}
+            {summary.username} · {sessionDateLabel} · {formatRange(summary.startTimestamp, summary.endTimestamp)}
           </p>
           <h2 className="font-semibold text-xl mt-0.5">{summary.title}</h2>
         </div>
@@ -434,7 +344,7 @@ export default function SessionSummaryCard({
           className="rounded-full px-3 py-1 text-xs font-bold shrink-0"
           style={{ backgroundColor: focusBadgeBackground, color: focusBadgeText }}
         >
-          {roundedProductivity}% focused
+          {roundedProductivity}% productive
         </div>
       </div>
 
@@ -445,9 +355,9 @@ export default function SessionSummaryCard({
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <StatPill label="Focus" value={summary.productivityRate} />
             <StatPill label="Recovery" value={summary.distractionRecoveryTime} />
-            <StatPill label="Breaks" value={summary.adherenceToBreakTime} />
-            <StatPill label="Chaos" value={summary.chaosScore} />
-            <StatPill label="Ponder" value={100 - summary.idleRatio} />
+            <StatPill label="Discipline" value={summary.adherenceToBreakTime} />
+            <StatPill label="Flow" value={summary.flowScore} />
+            <StatPill label="Activity" value={100 - summary.idleRatio} />
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -490,3 +400,4 @@ export default function SessionSummaryCard({
     </article>
   );
 }
+
