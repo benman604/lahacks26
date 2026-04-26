@@ -41,10 +41,14 @@ export async function POST(req: Request) {
   const body = await req.json();
   const { dataUrl, history = [] } = body as { dataUrl?: string; history?: unknown };
 
-  console.log("Received data for Gemini analysis", { dataUrl: !!dataUrl, historyLength: Array.isArray(history) ? history.length : "invalid" });
-
+  console.log("Received data for Gemini analysis", { dataUrl: !!dataUrl, history: history });
+  // attempt to validate history; if validation fails, log the error and fall back to raw array if possible
   const parsedHistory = HistorySchema.safeParse(history);
-  const historyItems = parsedHistory.success ? parsedHistory.data : [];
+  if (!parsedHistory.success) {
+    console.warn("/api/gemini: history did not validate against schema", parsedHistory.error.format());
+  }
+  const historyItems = Array.isArray(history) ? (parsedHistory.success ? parsedHistory.data : history) : [];
+  console.log(`/api/gemini: using ${Array.isArray(historyItems) ? historyItems.length : 0} history items`);
 
   const [header, imageBase64] = (dataUrl || "").split(",");
   const mimeType = header ? header.split(":")[1].split(";")[0] : "image/png";

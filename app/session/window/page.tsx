@@ -8,7 +8,7 @@ import { listen } from "@tauri-apps/api/event";
 
 const blockerLabels: string[] = [];
 const MAX_CONTEXT_SIZE = 5;
-const ANALYSIS_INTERVAL_MS = 40 * 1000; // analyze every 40 seconds
+const ANALYSIS_INTERVAL_MS = 20 * 1000; // analyze every 40 seconds
 
 export default function SessionWindow() {
   const [secondsLeft, setSecondsLeft] = useState<number>(0);
@@ -46,9 +46,19 @@ export default function SessionWindow() {
   }
 
   const [history, setHistory] = useState<ScreenshotData[]>([]);
+  const historyRef = useRef<ScreenshotData[]>([]);
+
+	function appendHistory(entry: ScreenshotData) {
+		setHistory((prev) => {
+			const next = [...prev, entry];
+			historyRef.current = next; // 🔑 keep ref in sync immediately
+			return next;
+		});
+	}
 
   async function analyzeCurrentScreenshot() {
     try {
+			console.log("history:", history);
       // ensure recording active and video present
       if (!streamRef.current || !videoRef.current) throw new Error("Recording not enabled");
       if (!canvasRef.current) canvasRef.current = document.createElement("canvas");
@@ -62,10 +72,11 @@ export default function SessionWindow() {
       const dataUrl = c.toDataURL("image/png");
 			console.log("screenshot taken, analyzing with Gemini...", { dataUrl, history });
 
+      const toSend = historyRef.current.slice(-MAX_CONTEXT_SIZE);
       const res = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl, history: history.slice(history.length - MAX_CONTEXT_SIZE) }),
+        body: JSON.stringify({ dataUrl, history: toSend }),
       });
 
       const data = await res.json();
@@ -82,11 +93,7 @@ export default function SessionWindow() {
         websiteOrApp: data.websiteOrApp,
         isIdle: data.isIdle,
       };
-      setHistory((h) => {
-        const next = [...h, entry];
-        // if (next.length > MAX_CONTEXT_SIZE) return next.slice(next.length - MAX_CONTEXT_SIZE);
-        return next;
-      });
+      appendHistory(entry);
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error("analyzeCurrentScreenshot failed", e);
@@ -120,8 +127,8 @@ export default function SessionWindow() {
 		analyzeCurrentScreenshot();
 
 		// start analysing screenshots at intervals
-		const intervalId = window.setInterval(() => {
-			analyzeCurrentScreenshot();
+		const intervalId = window.setInterval(async () => {
+			await analyzeCurrentScreenshot();
 		}, ANALYSIS_INTERVAL_MS);
 
 		return () => {
