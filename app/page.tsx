@@ -10,15 +10,6 @@ import SessionSummary from "./components/SessionSummary";
 import RightSidebar from "./components/RightSidebar";
 import { type RawSessionData } from "./types";
 import { app } from "../lib/firebase";
-import {
-  getAuth,
-  onAuthStateChanged,
-  signInWithPopup,
-  signInWithRedirect,
-  GoogleAuthProvider,
-  signOut,
-  User,
-} from "firebase/auth";
 
 const posts: FeedPost[] = [
   {
@@ -244,65 +235,12 @@ export default function Home() {
     );
   }
 
-    const [user, setUser] = useState<User | null>(null);
-
-  const auth = getAuth(app);
-
-  useEffect(() => {
-    const authInstance = getAuth(app);
-
-    const unsubscribe = onAuthStateChanged(authInstance, (u) => {
-      console.log("AUTH STATE CHANGED:", u);
-      setUser(u);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const handleSignIn = () => {
-    const provider = new GoogleAuthProvider();
-    signInWithRedirect(auth, provider)
-      .then((result) => {
-        console.log("SIGNED IN:", result.user);
-      })
-      .catch((err) => {
-        console.error("SIGN IN ERROR:", err);
-      });
-  };
-
-  // 🚪 Sign out
-  const handleSignOut = async () => {
-    await signOut(auth);
-  };
-
 
   const selectClass =
     "text-sm border border-gray-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-orange-400";
 
   return (
     <div className="flex gap-8 max-w-7xl mx-auto w-full px-6 py-8">
-      <div>
-        {user ? (
-          <div className="flex items-center gap-4">
-            <img src={user.photoURL ?? undefined} alt="Profile" className="w-8 h-8 rounded-full" />
-            <span className="text-sm font-medium">{user.displayName}</span>
-            <button
-              onClick={handleSignOut}
-              className="ml-4 px-3 py-1.5 rounded text-sm bg-gray-200 hover:bg-gray-300 transition"
-            >
-              Sign Out
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={handleSignIn}
-            className="px-3 py-1.5 rounded text-sm bg-blue-500 text-white hover:bg-blue-600 transition"
-          >
-            Sign In with Google
-          </button>
-        )}
-      </div>
-
       <div className="hidden lg:block"><LeftSidebar /></div>
       <main className="flex-1 flex flex-col gap-4 min-w-0">
         {/* Start lock-in bar */}

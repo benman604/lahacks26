@@ -1,5 +1,8 @@
 "use client";
 
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "../../lib/db";
+
 import React from "react";
 import SessionSummaryCard from "./SessionSummaryCard";
 import type { AppElement, FocusElement, RawSessionData, ScreenshotData, SessionData } from "../types";
@@ -20,6 +23,16 @@ function toMs(value: Date) {
 function clampDate(value: Date, min: Date, max: Date) {
   const t = Math.min(Math.max(toMs(value), toMs(min)), toMs(max));
   return new Date(t);
+}
+
+export async function createSession(data: SessionData) {
+  const docRef = await addDoc(collection(db, "p2p2"), {
+    ...data,
+    startTimestamp: data.startTimestamp,
+    endTimestamp: data.endTimestamp,
+  });
+
+  return docRef.id;
 }
 
 function sortScreenshots(data: ScreenshotData[]) {
@@ -156,13 +169,20 @@ function buildSession(session: RawSessionData): SessionData {
 export default function SessionSummary({ session, onNext }: Props) {
   const builtSession = React.useMemo(() => buildSession(session), [session]);
 
+  function next() {
+    createSession(builtSession).then((e) => {
+      console.log("Session saved with ID", e);
+    });
+    onNext();
+  }
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#fffaf6_0%,#fffdfb_45%,#f4efe9_100%)] px-6 py-8">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl flex-col items-center justify-center gap-4">
         <SessionSummaryCard session={builtSession} username="You" />
 
         <button
-          onClick={onNext}
+          onClick={next}
           className="rounded-full px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
           style={{ backgroundColor: "var(--p2p-accent)" }}
         >
