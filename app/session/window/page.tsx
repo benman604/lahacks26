@@ -197,6 +197,14 @@ export default function SessionWindow() {
     }
   }, [rawSessionData]);
 
+  // when break timer hits 0, end the break and re-block
+  useEffect(() => {
+    if (onBreak && breakSecondsLeft <= 0) {
+      endBreak();
+      openBlockers();
+    }
+  }, [breakSecondsLeft, onBreak]);
+
   useEffect(() => {
     const unlistenTrigger = listen("trigger-blockers", async () => {
       await openBlockers();
@@ -210,6 +218,11 @@ export default function SessionWindow() {
       await closeBlockers();
       stopTimer();
       setOnBreak(true);
+      setHistory((prev) => {
+        const next = [...prev, { timestamp: new Date(), focusType: "break" as const, websiteOrApp: "Break", isIdle: false }];
+        historyRef.current = next;
+        return next;
+      });
       if (breakTimerRef.current) clearInterval(breakTimerRef.current);
       breakTimerRef.current = window.setInterval(() => {
         setBreakSecondsLeft((s) => s - 1);
@@ -338,6 +351,7 @@ export default function SessionWindow() {
   function startBreak() {
     stopTimer();
     setOnBreak(true);
+    appendHistory({ timestamp: new Date(), focusType: "break", websiteOrApp: "Break", isIdle: false });
     if (breakTimerRef.current) clearInterval(breakTimerRef.current);
     breakTimerRef.current = window.setInterval(() => {
       setBreakSecondsLeft((s) => s - 1);
@@ -350,6 +364,7 @@ export default function SessionWindow() {
       breakTimerRef.current = null;
     }
     setOnBreak(false);
+    appendHistory({ timestamp: new Date(), focusType: "break", websiteOrApp: "Break", isIdle: false });
     // breakSecondsLeft is intentionally NOT reset — preserves remaining balance
     startTimer();
   }

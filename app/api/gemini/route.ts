@@ -9,14 +9,13 @@ const model = new ChatGroq({
 
 const ScreenshotDataSchema = z.object({
   focusType: z
-    .enum(["productive", "supportive", "neutral", "distracted", "break"])
+    .enum(["productive", "supportive", "neutral", "distracted"])
     .describe(`
 Classify the user's current activity:
 - productive: directly working on the stated subject/task
 - supportive: indirectly helping the task, such as tutorials, explanations, docs, examples, research, or reference material
 - neutral: unclear or insufficient evidence
 - distracted: clearly unrelated to the stated subject/task
-- break: intentionally resting or taking a break
 `),
   websiteOrApp: z.string().describe(
     "The website or app currently visible that takes up a majority of the screen."
@@ -57,7 +56,6 @@ Classify the activity as:
 - supportive: related learning, research, tutorials, explanations, examples, documentation, reference material, or setup work
 - neutral: unclear whether it is related
 - distracted: clearly unrelated to the subject/task
-- break: the user appears to be intentionally resting
 
 Important:
 - Do NOT mark something distracted just because it is YouTube, Google, a browser, or messaging.
@@ -71,7 +69,7 @@ Important:
 
 const HistoryItemSchema = z.object({
   timestamp: z.string().optional(),
-  focusType: z.enum(["productive", "supportive", "neutral", "distracted", "break"]),
+  focusType: z.enum(["productive", "supportive", "neutral", "distracted"]),
   websiteOrApp: z.string(),
   isIdle: z.union([z.boolean(), z.string()]).optional(),
   description: z.string().optional(),
