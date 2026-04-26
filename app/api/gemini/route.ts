@@ -1,19 +1,17 @@
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatGroq } from "@langchain/groq";
 import { HumanMessage } from "@langchain/core/messages";
 import * as z from "zod";
 import { ScreenshotData } from "@/app/types";
 
-const model = new ChatGoogleGenerativeAI({
-  model: "gemini-2.5-flash",
-  maxOutputTokens: 2048,
+const model = new ChatGroq({
+  model: "meta-llama/llama-4-scout-17b-16e-instruct",
 });
 
 const ScreenshotDataSchema = z.object({
-  //timestamp: z.date(),
   focusType: z.enum(["productive", "distracted", "break"]).describe("Whether the user appears productive, distracted, or on a break"),
   websiteOrApp: z.string().describe("The website or app currently visible that takes up a majority of the screen. If on browser, identify the main website (e.g. 'YouTube', 'Reddit', 'Google Docs'). If on desktop, identify the primary application (e.g. 'Slack', 'VS Code', 'Finder')"),
-  isIdle: z.boolean().describe("Whether the user is idle"),
-  description: z.string().describe("Description of what is on screen"),
+  isIdle: z.string().optional().describe("Whether the user is idle. Return 'true' or 'false'"),
+  description: z.string().optional().describe("Description of what is on screen"),
   instructOffDistraction: z.string().describe("Instruction to the user to get back on track if they are distracted, for example, 'Get off reels, and back to {subject}!'. Only populate if focus is distracted.").optional(),
 });
 
@@ -28,20 +26,19 @@ const PROMPT = `Analyze this screenshot. Identify the website or app visible. Ba
 The following sites/apps are always considered distracting regardless of context: ${HARDCODED_SITES.join(", ")}.`;
 
 const HistoryItemSchema = z.object({
-  // timestamp optional for compatibility
   timestamp: z.string().optional(),
   focusType: z.enum(["productive", "distracted", "break"]),
   websiteOrApp: z.string(),
-  isIdle: z.boolean(),
+  isIdle: z.union([z.boolean(), z.string()]).optional(),
   description: z.string().optional(),
 });
 
 const HistorySchema = z.array(HistoryItemSchema);
 
 export async function POST(req: Request) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return Response.json({ error: "GEMINI_API_KEY not set" }, { status: 500 });
+    return Response.json({ error: "GROQ_API_KEY not set" }, { status: 500 });
   }
 
   const body = await req.json();
@@ -87,7 +84,12 @@ export async function POST(req: Request) {
 
   const message = new HumanMessage({ content });
 
-  const result: z.infer<typeof ScreenshotDataSchema> = await structuredModel.invoke([message]);
-  console.log("[gemini]", JSON.stringify(result, null, 2));
+  const raw = await structuredModel.invoke([message]);
+  const result = {
+    ...raw,
+    isIdle: raw.isIdle === true || raw.isIdle === "true",
+    description: raw.description ?? "",
+  };
+  console.log("[groq]", JSON.stringify(result, null, 2));
   return Response.json(result);
 }
