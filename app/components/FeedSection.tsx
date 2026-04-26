@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 import SessionSummaryCard from "./SessionSummaryCard";
 import type { SessionData } from "../types";
 
@@ -233,10 +231,6 @@ export default function FeedSection({
   highlightedPostId: number | null;
   onHighlightPostId: (postId: number) => void;
 }) {
-  const [subject, setSubject] = useState("Organic Chem");
-  const [duration, setDuration] = useState("50");
-  const [breakTime, setBreakTime] = useState("10");
-
   const selectClass =
     "text-sm border border-gray-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-orange-400";
 
