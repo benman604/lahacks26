@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { currentMonitor, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
@@ -9,6 +9,16 @@ import FeedSection, { type FeedPost } from "./components/FeedSection";
 import SessionSummary from "./components/SessionSummary";
 import RightSidebar from "./components/RightSidebar";
 import { type RawSessionData } from "./types";
+import { app } from "../lib/firebase";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithPopup,
+  signInWithRedirect,
+  GoogleAuthProvider,
+  signOut,
+  User,
+} from "firebase/auth";
 
 const posts: FeedPost[] = [
   {
@@ -114,10 +124,10 @@ function normalizeRawSessionData(payload: RawSessionDataWire): RawSessionData {
 }
 
 export default function Home() {
-  const latestRawSessionDataRef = React.useRef<RawSessionData | null>(null);
-  const [sessionSummaryData, setSessionSummaryData] = React.useState<RawSessionData | null>(null);
+  const latestRawSessionDataRef = useRef<RawSessionData | null>(null);
+  const [sessionSummaryData, setSessionSummaryData] = useState<RawSessionData | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const unlistenPromise = listen("session-window-ready", async () => {
       const data = latestRawSessionDataRef.current;
       if (!data) return;
@@ -147,17 +157,17 @@ export default function Home() {
     };
   }, []);
 
-  const [highlightedPostId, setHighlightedPostId] = React.useState<number | null>(posts[0]?.id ?? null);
-  const highlightedPost = React.useMemo(
+  const [highlightedPostId, setHighlightedPostId] = useState<number | null>(posts[0]?.id ?? null);
+  const highlightedPost = useMemo(
     () => posts.find((p) => p.id === highlightedPostId) ?? null,
     [highlightedPostId]
   );
 
-  const [subject, setSubject] = React.useState(() => {
+  const [subject, setSubject] = useState(() => {
     const initial = posts[0]?.title ? deriveSubjectFromTitle(posts[0].title) : "";
     return initial || "Organic Chem";
   });
-  const [breakTime, setBreakTime] = React.useState("10");
+  const [breakTime, setBreakTime] = useState("10");
 
   function buildRawSessionData(): RawSessionData {
     const idealBreakTimeMinutes = parsePositiveInt(breakTime, 10);
@@ -234,11 +244,65 @@ export default function Home() {
     );
   }
 
+    const [user, setUser] = useState<User | null>(null);
+
+  const auth = getAuth(app);
+
+  useEffect(() => {
+    const authInstance = getAuth(app);
+
+    const unsubscribe = onAuthStateChanged(authInstance, (u) => {
+      console.log("AUTH STATE CHANGED:", u);
+      setUser(u);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleSignIn = () => {
+    const provider = new GoogleAuthProvider();
+    signInWithRedirect(auth, provider)
+      .then((result) => {
+        console.log("SIGNED IN:", result.user);
+      })
+      .catch((err) => {
+        console.error("SIGN IN ERROR:", err);
+      });
+  };
+
+  // 🚪 Sign out
+  const handleSignOut = async () => {
+    await signOut(auth);
+  };
+
+
   const selectClass =
     "text-sm border border-gray-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-orange-400";
 
   return (
     <div className="flex gap-8 max-w-7xl mx-auto w-full px-6 py-8">
+      <div>
+        {user ? (
+          <div className="flex items-center gap-4">
+            <img src={user.photoURL ?? undefined} alt="Profile" className="w-8 h-8 rounded-full" />
+            <span className="text-sm font-medium">{user.displayName}</span>
+            <button
+              onClick={handleSignOut}
+              className="ml-4 px-3 py-1.5 rounded text-sm bg-gray-200 hover:bg-gray-300 transition"
+            >
+              Sign Out
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleSignIn}
+            className="px-3 py-1.5 rounded text-sm bg-blue-500 text-white hover:bg-blue-600 transition"
+          >
+            Sign In with Google
+          </button>
+        )}
+      </div>
+
       <div className="hidden lg:block"><LeftSidebar /></div>
       <main className="flex-1 flex flex-col gap-4 min-w-0">
         {/* Start lock-in bar */}
