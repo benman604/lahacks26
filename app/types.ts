@@ -1,23 +1,23 @@
-type FocusElement = {
+export type FocusElement = {
 	startTimestamp: Date;
 	endTimestamp: Date;
 	focusType: "focus" | "distracted" | "break";
 }
 
-type AppElement = {
+export type AppElement = {
 	startTimestamp: Date;
 	endTimestamp: Date;
 	activityName: string;
 }
 
-type ScreenshotData = {
+export type ScreenshotData = {
 	timestamp: Date;
 	focusType: "focus" | "distracted" | "break";
 	websiteOrApp: string;
 	isIdle: boolean;
 }
 
-type RawSessionData = {
+export type RawSessionData = {
 	title: string;
 	idealBreakTimeMinutes: number;
 	startTimestamp: Date;
@@ -25,7 +25,7 @@ type RawSessionData = {
 	data: ScreenshotData[];
 }
 
-type SessionData = {
+export type SessionData = {
 	userId: string;
 	title: string;
 	startTimestamp: Date;
@@ -37,7 +37,7 @@ type SessionData = {
 
 // Define a function Adherence(average, ideal) that outputs a score from 0-100 based on the formula above
 
-type SessionSummary = {
+export type SessionSummary = {
 	username: string;
 	title: string;
 	startTimestamp: Date;
