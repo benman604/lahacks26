@@ -146,7 +146,7 @@ function StatPill({ label, value }: { label: string; value: number }) {
 function RadarChart({ summary }: { summary: SessionSummary }) {
   const stats = [
     { label: "Focus", value: summary.productivityRate },
-    { label: "Recovery", value: summary.distractionRecoveryTime },
+    { label: "Stamina", value: summary.stamina },
     { label: "Discipline", value: summary.adherenceToBreakTime },
     { label: "Flow", value: summary.flowScore },
     { label: "Activity", value: 100 - summary.idleRatio },
@@ -259,7 +259,7 @@ export default function SessionSummaryCard({
   const sessionDateLabel = formatSessionDateLabel(summary.startTimestamp);
   const roundedProductivity = computeProductivityScore({
     productivityRate: summary.productivityRate,
-    distractionRecoveryTime: summary.distractionRecoveryTime,
+    stamina: summary.stamina,
     adherenceToBreakTime: summary.adherenceToBreakTime,
     flowScore: summary.flowScore,
     idleRatio: summary.idleRatio,
@@ -335,7 +335,7 @@ export default function SessionSummaryCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs text-gray-500">
-            {summary.username} · {sessionDateLabel} · {formatRange(summary.startTimestamp, summary.endTimestamp)}
+            {username} · {sessionDateLabel} · {formatRange(summary.startTimestamp, summary.endTimestamp)}
           </p>
           <h2 className="font-semibold text-xl mt-0.5">{summary.title}</h2>
         </div>
@@ -354,7 +354,7 @@ export default function SessionSummaryCard({
         <div className="flex flex-col justify-center gap-4 min-w-0">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <StatPill label="Focus" value={summary.productivityRate} />
-            <StatPill label="Recovery" value={summary.distractionRecoveryTime} />
+            <StatPill label="Stamina" value={summary.stamina} />
             <StatPill label="Discipline" value={summary.adherenceToBreakTime} />
             <StatPill label="Flow" value={summary.flowScore} />
             <StatPill label="Activity" value={100 - summary.idleRatio} />

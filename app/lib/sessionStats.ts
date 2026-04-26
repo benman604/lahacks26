@@ -29,17 +29,39 @@ export function clampPercent(value: number) {
 	return Math.max(0, Math.min(100, value));
 }
 
-function computeAverageDurationMinutes<T extends { startTimestamp: Date; endTimestamp: Date }>(
-	elements: T[],
-) {
-	if (elements.length === 0) return 0;
+function staminaScoreFromAverageGapMinutes(averageGapMinutes: number, targetMinutes = 60): number {
+	if (targetMinutes <= 0) return 0;
+	if (averageGapMinutes >= targetMinutes) return 100;
+	if (averageGapMinutes <= 0) return 0;
 
-	const totalSeconds = elements.reduce(
-		(sum, el) => sum + secondsBetween(el.startTimestamp, el.endTimestamp),
-		0,
-	);
+	// Use a normalized sigmoid curve (similar spirit to `adherence`, but reversed: higher gap => higher score).
+	const alpha = 10 / targetMinutes;
+	const center = targetMinutes / 2;
+	const raw = 1 / (1 + Math.exp(-alpha * (averageGapMinutes - center)));
+	const raw0 = 1 / (1 + Math.exp(-alpha * (0 - center)));
+	const rawT = 1 / (1 + Math.exp(-alpha * (targetMinutes - center)));
+	const normalized = (raw - raw0) / (rawT - raw0);
 
-	return totalSeconds / elements.length / 60;
+	return Math.round(clampPercent(normalized * 100));
+}
+
+function computeAverageMinutesBetweenDistractions(distractionTimes: Date[] | undefined): number {
+	if (!distractionTimes || distractionTimes.length < 2) return Infinity;
+
+	const times = [...distractionTimes]
+		.map((d) => new Date(d))
+		.sort((a, b) => a.getTime() - b.getTime());
+
+	let totalGapSeconds = 0;
+	let gapCount = 0;
+	for (let i = 1; i < times.length; i += 1) {
+		const gapSeconds = secondsBetween(times[i - 1], times[i]);
+		totalGapSeconds += gapSeconds;
+		gapCount += 1;
+	}
+
+	if (gapCount === 0) return Infinity;
+	return totalGapSeconds / gapCount / 60;
 }
 
 function calculateFlowScore(
@@ -110,7 +132,16 @@ export function computeSessionSummary(session: SessionData): SessionSummary {
 		.reduce((sum, el) => sum + secondsBetween(el.startTimestamp, el.endTimestamp), 0);
 
 	const breakElements = session.focusElements.filter((el) => el.focusType === "break");
-	const averageBreakMinutes = computeAverageDurationMinutes(breakElements);
+	const totalBreakMinutes =
+		breakElements.reduce(
+			(sum, el) => sum + secondsBetween(el.startTimestamp, el.endTimestamp),
+			0,
+		) / 60;
+
+	const averageGapMinutes = computeAverageMinutesBetweenDistractions(session.distractionTimes);
+	const stamina = Number.isFinite(averageGapMinutes)
+		? staminaScoreFromAverageGapMinutes(averageGapMinutes, 60)
+		: 100;
 
 	return {
 		username: "You",
@@ -120,8 +151,8 @@ export function computeSessionSummary(session: SessionData): SessionSummary {
 		focusElements: session.focusElements,
 		appElements: session.appElements,
 		productivityRate: totalSeconds > 0 ? clampPercent((focusSeconds / totalSeconds) * 100) : 0,
-		distractionRecoveryTime: 0,
-		adherenceToBreakTime: adherence(averageBreakMinutes, session.totalBreakTimeMinutes) * 100,
+		stamina,
+		adherenceToBreakTime: adherence(totalBreakMinutes, session.totalBreakTimeMinutes) * 100,
 		flowScore: calculateFlowScore(session.focusElements, totalSeconds, session.distractionTimes?.length || 0),
 		idleRatio:
 			totalSeconds > 0 ? clampPercent((session.idleTimeSeconds / totalSeconds) * 100) : 0,
@@ -134,7 +165,7 @@ export function computeProductivityScore(stats: SessionStats): number {
 
 	const weightedScore =
 		stats.productivityRate * 0.4 +
-		stats.distractionRecoveryTime * 0.2 +
+		stats.stamina * 0.2 +
 		stats.adherenceToBreakTime * 0.15 +
 		stats.flowScore * 0.15 +
 		activeScore * 0.1;
@@ -211,20 +242,20 @@ export function computeAverageMetrics(sessionList: SessionData[]) {
 
       return {
         focus: totals.focus + metrics.productivityRate,
-        recovery: totals.recovery + metrics.distractionRecoveryTime,
+				stamina: totals.stamina + metrics.stamina,
         discipline: totals.discipline + metrics.adherenceToBreakTime,
         flow: totals.flow + metrics.flowScore,
         activity: totals.activity + activityScore,
       };
     },
-    { focus: 0, recovery: 0, discipline: 0, flow: 0, activity: 0 }
+		{ focus: 0, stamina: 0, discipline: 0, flow: 0, activity: 0 }
   );
 
   const divisor = Math.max(1, sessionList.length);
 
   return {
     focus: Math.round(metricsTotals.focus / divisor),
-    recovery: Math.round(metricsTotals.recovery / divisor),
+		stamina: Math.round(metricsTotals.stamina / divisor),
     discipline: Math.round(metricsTotals.discipline / divisor),
     flow: Math.round(metricsTotals.flow / divisor),
     activity: Math.round(metricsTotals.activity / divisor),

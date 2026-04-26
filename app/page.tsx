@@ -5,7 +5,7 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { currentMonitor, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import LeftSidebar from "./components/LeftSidebar";
-import FeedSection, { type FeedPost } from "./components/FeedSection";
+import FeedSection from "./components/FeedSection";
 import SessionSummary from "./components/SessionSummary";
 import RightSidebar from "./components/RightSidebar";
 import { SessionData, type RawSessionData } from "./types";
@@ -17,6 +17,7 @@ const sessions: SessionData[] = [
     totalBreakTimeMinutes: 5,
     startTimestamp: new Date("2026-04-25T17:49:00"),
     endTimestamp: new Date("2026-04-25T19:29:00"),
+    distractionTimes: [],
     focusElements: [
       {
         startTimestamp: new Date("2026-04-25T17:49:00"),
@@ -84,6 +85,7 @@ const sessions: SessionData[] = [
     totalBreakTimeMinutes: 8,
     startTimestamp: new Date("2026-04-25T11:02:00"),
     endTimestamp: new Date("2026-04-25T12:02:00"),
+    distractionTimes: [],
     focusElements: [
       {
         startTimestamp: new Date("2026-04-25T11:02:00"),
@@ -131,6 +133,7 @@ const sessions: SessionData[] = [
     totalBreakTimeMinutes: 10,
     startTimestamp: new Date("2026-04-25T21:10:00"),
     endTimestamp: new Date("2026-04-25T22:40:00"),
+    distractionTimes: [],
     focusElements: [
       {
         startTimestamp: new Date("2026-04-25T21:10:00"),
@@ -209,12 +212,6 @@ const sessions: SessionData[] = [
   },
 ];
 
-function deriveSubjectFromTitle(title: string) {
-  const parts = title.split("—");
-  const maybe = parts.length > 1 ? parts[parts.length - 1] : title;
-  return maybe.trim();
-}
-
 function parsePositiveInt(value: string, fallback: number) {
   const n = Number.parseInt(value, 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;
@@ -288,7 +285,7 @@ function normalizeRawSessionData(payload: RawSessionDataWire): RawSessionData {
 export default function Home() {
   const latestRawSessionDataRef = React.useRef<RawSessionData | null>(null);
   const [sessionSummaryData, setSessionSummaryData] = React.useState<RawSessionData | null>(null);
-  const [allSessions, setAllSessions] = React.useState<SessionData[]>(sessions);
+  const [allSessions] = React.useState<SessionData[]>(sessions);
 
   React.useEffect(() => {
     const unlistenPromise = listen("session-window-ready", async () => {
@@ -299,7 +296,6 @@ export default function Home() {
       try {
         await w.emit("session-data", data);
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error("failed to emit session-data", e);
       }
     });
@@ -346,7 +342,6 @@ export default function Home() {
       try {
         await existing.emit("session-data", rawSessionData);
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error("failed to emit session-data to existing window", e);
       }
       return;
@@ -381,7 +376,6 @@ export default function Home() {
           await currentWindow.minimize();
         }
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error("failed to position session window", e);
       }
     });

@@ -21,16 +21,11 @@ export type FeedPost = {
   comments: FeedComment[];
 };
 
-const defaultPosts: FeedPost[] = [];
-
 export default function FeedSection({
   sessions
 }: {
   sessions: SessionData[];
 }) {
-  const selectClass =
-    "text-sm border border-gray-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-orange-400";
-
   return (
     <main className="flex-1 flex flex-col gap-4 min-w-0">
 

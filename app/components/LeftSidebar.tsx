@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import type { SessionData } from "../types";
 import { computeAverageMetrics, computeLifetimeStats } from "../lib/sessionStats";
 
@@ -17,7 +15,7 @@ export default function LeftSidebar({
 
   const lifetimeAverages = [
     { label: "Foc", value: `${averageMetrics.focus}` },
-    { label: "Rec", value: `${averageMetrics.recovery}` },
+    { label: "Sta", value: `${averageMetrics.stamina}` },
     { label: "Dis", value: `${averageMetrics.discipline}` },
     { label: "Flo", value: `${averageMetrics.flow}` },
     { label: "Act", value: `${averageMetrics.activity}` },
