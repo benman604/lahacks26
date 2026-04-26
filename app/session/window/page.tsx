@@ -7,6 +7,8 @@ import { availableMonitors, LogicalPosition, LogicalSize, currentMonitor } from 
 import { listen } from "@tauri-apps/api/event";
 
 const blockerLabels: string[] = [];
+const MAX_CONTEXT_SIZE = 5;
+const ANALYSIS_INTERVAL_MS = 40 * 1000; // analyze every 40 seconds
 
 export default function SessionWindow() {
   const [secondsLeft, setSecondsLeft] = useState<number>(0);
@@ -43,7 +45,6 @@ export default function SessionWindow() {
 
   }
 
-  const MAX_CONTEXT_SIZE = 5;
   const [history, setHistory] = useState<ScreenshotData[]>([]);
 
   async function analyzeCurrentScreenshot() {
@@ -64,7 +65,7 @@ export default function SessionWindow() {
       const res = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl, history }),
+        body: JSON.stringify({ dataUrl, history: history.slice(history.length - MAX_CONTEXT_SIZE) }),
       });
 
       const data = await res.json();
@@ -83,7 +84,7 @@ export default function SessionWindow() {
       };
       setHistory((h) => {
         const next = [...h, entry];
-        if (next.length > MAX_CONTEXT_SIZE) return next.slice(next.length - MAX_CONTEXT_SIZE);
+        // if (next.length > MAX_CONTEXT_SIZE) return next.slice(next.length - MAX_CONTEXT_SIZE);
         return next;
       });
     } catch (e) {
@@ -110,6 +111,23 @@ export default function SessionWindow() {
       closeBlockers();
     };
   }, []);
+
+	
+	useEffect(() => {
+		if (!recordingEnabled) return;
+
+		// the first screenshot
+		analyzeCurrentScreenshot();
+
+		// start analysing screenshots at intervals
+		const intervalId = window.setInterval(() => {
+			analyzeCurrentScreenshot();
+		}, ANALYSIS_INTERVAL_MS);
+
+		return () => {
+			window.clearInterval(intervalId);
+		}
+	}, [recordingEnabled]);
 
   async function openBlockers() {
     let monitors = [] as any[];

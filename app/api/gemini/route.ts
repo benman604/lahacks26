@@ -41,6 +41,8 @@ export async function POST(req: Request) {
   const body = await req.json();
   const { dataUrl, history = [] } = body as { dataUrl?: string; history?: unknown };
 
+  console.log("Received data for Gemini analysis", { dataUrl: !!dataUrl, historyLength: Array.isArray(history) ? history.length : "invalid" });
+
   const parsedHistory = HistorySchema.safeParse(history);
   const historyItems = parsedHistory.success ? parsedHistory.data : [];
 
