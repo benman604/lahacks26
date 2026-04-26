@@ -8,31 +8,204 @@ import LeftSidebar from "./components/LeftSidebar";
 import FeedSection, { type FeedPost } from "./components/FeedSection";
 import SessionSummary from "./components/SessionSummary";
 import RightSidebar from "./components/RightSidebar";
-import { type RawSessionData } from "./types";
+import { SessionData, type RawSessionData } from "./types";
 
-const posts: FeedPost[] = [
+const sessions: SessionData[] = [
   {
-    id: 1,
-    initials: "B",
-    color: "#3A6B9E",
-    name: "Ben M.",
-    date: "April 26, 2026 · 5:49 PM",
+    userId: "ben",
     title: "Afternoon Study — Organic Chem",
-    kudos: 12,
-    comments: [
-      { initials: "M", color: "#7B5EA7", name: "Maya K.", text: "this is huge — keep going!" },
-      { initials: "J", color: "#3A7D44", name: "Jordan T.", text: "the 90-min stretch is unreal!" },
+    totalBreakTimeMinutes: 5,
+    startTimestamp: new Date("2026-04-25T17:49:00"),
+    endTimestamp: new Date("2026-04-25T19:29:00"),
+    focusElements: [
+      {
+        startTimestamp: new Date("2026-04-25T17:49:00"),
+        endTimestamp: new Date("2026-04-25T18:39:00"),
+        focusType: "productive",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T18:39:00"),
+        endTimestamp: new Date("2026-04-25T18:49:00"),
+        focusType: "break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T18:49:00"),
+        endTimestamp: new Date("2026-04-25T19:09:00"),
+        focusType: "productive",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T19:09:00"),
+        endTimestamp: new Date("2026-04-25T19:19:00"),
+        focusType: "break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T19:19:00"),
+        endTimestamp: new Date("2026-04-25T19:29:00"),
+        focusType: "productive",
+      }
     ],
+    appElements: [
+      {
+        startTimestamp: new Date("2026-04-25T17:49:00"),
+        endTimestamp: new Date("2026-04-25T18:25:00"),
+        activityName: "Lecture notes",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T18:25:00"),
+        endTimestamp: new Date("2026-04-25T18:39:00"),
+        activityName: "Practice problems",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T18:39:00"),
+        endTimestamp: new Date("2026-04-25T18:49:00"),
+        activityName: "Break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T18:49:00"),
+        endTimestamp: new Date("2026-04-25T19:09:00"),
+        activityName: "Flashcards",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T19:09:00"),
+        endTimestamp: new Date("2026-04-25T19:19:00"),
+        activityName: "Messages",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T19:19:00"),
+        endTimestamp: new Date("2026-04-25T19:29:00"),
+        activityName: "Practice problems",
+      },
+    ],
+    idleTimeSeconds: 240,
   },
   {
-    id: 2,
-    initials: "E",
-    color: "#BF4800",
-    name: "Esther E.",
-    date: "April 25, 2026 · 11:02 AM",
+    userId: "esther",
     title: "Morning Focus — Linear Algebra",
-    kudos: 5,
-    comments: [],
+    totalBreakTimeMinutes: 8,
+    startTimestamp: new Date("2026-04-25T11:02:00"),
+    endTimestamp: new Date("2026-04-25T12:02:00"),
+    focusElements: [
+      {
+        startTimestamp: new Date("2026-04-25T11:02:00"),
+        endTimestamp: new Date("2026-04-25T11:47:00"),
+        focusType: "productive",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T11:47:00"),
+        endTimestamp: new Date("2026-04-25T11:55:00"),
+        focusType: "break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T11:55:00"),
+        endTimestamp: new Date("2026-04-25T12:02:00"),
+        focusType: "productive",
+      },
+    ],
+    appElements: [
+      {
+        startTimestamp: new Date("2026-04-25T11:02:00"),
+        endTimestamp: new Date("2026-04-25T11:30:00"),
+        activityName: "Problem set",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T11:30:00"),
+        endTimestamp: new Date("2026-04-25T11:47:00"),
+        activityName: "Proof review",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T11:47:00"),
+        endTimestamp: new Date("2026-04-25T11:55:00"),
+        activityName: "Break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T11:55:00"),
+        endTimestamp: new Date("2026-04-25T12:02:00"),
+        activityName: "Lecture recap",
+      },
+    ],
+    idleTimeSeconds: 90,
+  },
+  {
+    userId: "andyroo",
+    title: "Late Night Grind — History Reading",
+    totalBreakTimeMinutes: 10,
+    startTimestamp: new Date("2026-04-25T21:10:00"),
+    endTimestamp: new Date("2026-04-25T22:40:00"),
+    focusElements: [
+      {
+        startTimestamp: new Date("2026-04-25T21:10:00"),
+        endTimestamp: new Date("2026-04-25T21:16:00"),
+        focusType: "productive",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:16:00"),
+        endTimestamp: new Date("2026-04-25T21:34:00"),
+        focusType: "break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:34:00"),
+        endTimestamp: new Date("2026-04-25T21:48:00"),
+        focusType: "break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:48:00"),
+        endTimestamp: new Date("2026-04-25T22:17:00"),
+        focusType: "break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T22:17:00"),
+        endTimestamp: new Date("2026-04-25T22:28:00"),
+        focusType: "break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T22:28:00"),
+        endTimestamp: new Date("2026-04-25T22:40:00"),
+        focusType: "break",
+      },
+    ],
+    appElements: [
+      {
+        startTimestamp: new Date("2026-04-25T21:10:00"),
+        endTimestamp: new Date("2026-04-25T21:16:00"),
+        activityName: "Reading outline",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:16:00"),
+        endTimestamp: new Date("2026-04-25T21:25:00"),
+        activityName: "Short videos",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:25:00"),
+        endTimestamp: new Date("2026-04-25T21:34:00"),
+        activityName: "Group chat",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:34:00"),
+        endTimestamp: new Date("2026-04-25T21:48:00"),
+        activityName: "Break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T21:48:00"),
+        endTimestamp: new Date("2026-04-25T22:06:00"),
+        activityName: "Social media",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T22:06:00"),
+        endTimestamp: new Date("2026-04-25T22:17:00"),
+        activityName: "Online shopping",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T22:17:00"),
+        endTimestamp: new Date("2026-04-25T22:28:00"),
+        activityName: "Break",
+      },
+      {
+        startTimestamp: new Date("2026-04-25T22:28:00"),
+        endTimestamp: new Date("2026-04-25T22:40:00"),
+        activityName: "Messages",
+      },
+    ],
+    idleTimeSeconds: 1140,
   },
 ];
 
@@ -90,10 +263,8 @@ function normalizeRawSessionData(payload: RawSessionDataWire): RawSessionData {
   const data: RawSessionData["data"] = Array.isArray(payload.data)
     ? payload.data.map((entry) => {
         const wire = entry as ScreenshotDataWire;
-        const focusType: RawSessionData["data"][number]["focusType"] =
-          wire.focusType === "focus" || wire.focusType === "distracted" || wire.focusType === "break"
-            ? wire.focusType
-            : "focus";
+        // @ts-expect-error because data from wire is not typed
+        const focusType: RawSessionData["data"][number]["focusType"] = wire.focusType as string;
 
         return {
           timestamp: toDate(wire.timestamp, now),
@@ -106,7 +277,6 @@ function normalizeRawSessionData(payload: RawSessionDataWire): RawSessionData {
 
   return {
     title: typeof payload.title === "string" ? payload.title : "Session",
-    subject: typeof payload.subject === "string" ? payload.subject : "",
     totalBreakTimeMinutes: toPositiveNumber(payload.totalBreakTimeMinutes, 10),
     startTimestamp,
     endTimestamp,
@@ -118,6 +288,7 @@ function normalizeRawSessionData(payload: RawSessionDataWire): RawSessionData {
 export default function Home() {
   const latestRawSessionDataRef = React.useRef<RawSessionData | null>(null);
   const [sessionSummaryData, setSessionSummaryData] = React.useState<RawSessionData | null>(null);
+  const [allSessions, setAllSessions] = React.useState<SessionData[]>(sessions);
 
   React.useEffect(() => {
     const unlistenPromise = listen("session-window-ready", async () => {
@@ -149,27 +320,15 @@ export default function Home() {
     };
   }, []);
 
-  const [highlightedPostId, setHighlightedPostId] = React.useState<number | null>(posts[0]?.id ?? null);
-  const highlightedPost = React.useMemo(
-    () => posts.find((p) => p.id === highlightedPostId) ?? null,
-    [highlightedPostId]
-  );
-
-  const [subject, setSubject] = React.useState(() => {
-    const initial = posts[0]?.title ? deriveSubjectFromTitle(posts[0].title) : "";
-    return initial || "Organic Chem";
-  });
-  const [breakTime, setBreakTime] = React.useState("10");
+  const [subject, setSubject] = React.useState<string>("Organic Chem");
+  const [breakTime, setBreakTime] = React.useState<string>("10");
 
   function buildRawSessionData(): RawSessionData {
     const totalBreakTimeMinutes = parsePositiveInt(breakTime, 10);
     const startTimestamp = new Date();
-    const cleanSubject = subject.trim() || (highlightedPost ? deriveSubjectFromTitle(highlightedPost.title) : "");
-    const sessionTitle = cleanSubject || highlightedPost?.title || "Session";
 
     return {
-      title: sessionTitle,
-      subject: cleanSubject || "",
+      title: subject,
       totalBreakTimeMinutes,
       startTimestamp,
       endTimestamp: startTimestamp,
@@ -242,7 +401,7 @@ export default function Home() {
 
   return (
     <div className="flex gap-8 max-w-7xl mx-auto w-full px-6 py-8">
-      <div className="hidden lg:block"><LeftSidebar /></div>
+      <div className="hidden lg:block"><LeftSidebar sessions={allSessions} /></div>
       <main className="flex-1 flex flex-col gap-4 min-w-0">
         {/* Start lock-in bar */}
         <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
@@ -289,11 +448,7 @@ export default function Home() {
         </div>
 
         <FeedSection
-          posts={posts}
-          highlightedPostId={highlightedPostId}
-          onHighlightPostId={(postId) => {
-            setHighlightedPostId(postId);
-          }}
+          sessions={allSessions}
         />
       </main>
       <div className="hidden lg:block"><RightSidebar /></div>
