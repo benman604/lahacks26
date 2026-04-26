@@ -14,7 +14,7 @@ const sessions: SessionData[] = [
   {
     userId: "ben",
     title: "Afternoon Study — Organic Chem",
-    totalBreakTimeMinutes: 5,
+    totalBreakTimeMinutes: 10,
     startTimestamp: new Date("2026-04-25T17:49:00"),
     endTimestamp: new Date("2026-04-25T19:29:00"),
     distractionTimes: [],

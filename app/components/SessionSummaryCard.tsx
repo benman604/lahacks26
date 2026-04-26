@@ -47,6 +47,7 @@ function formatSessionDateLabel(date: Date) {
 
 function getTrafficLightColor(score: number) {
   const rounded = Math.round(clampPercent(score));
+  if (rounded >= 100) return "#00F5FF"; // Electric Cyan for "Perfect"
   if (rounded <= 69) return "#dc2626";
   if (rounded <= 89) return "#facc15";
   return "#16a34a";
@@ -115,6 +116,18 @@ function StatPill({ label, value }: { label: string; value: number }) {
       </div>
       <div className="relative mt-1 h-16 w-16">
         <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90">
+          {/* 1. Define the Glow Filter */}
+          <defs>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* Background Circle */}
           <circle
             cx="32"
             cy="32"
@@ -123,6 +136,8 @@ function StatPill({ label, value }: { label: string; value: number }) {
             stroke="#e5e7eb"
             strokeWidth="6"
           />
+
+          {/* Progress Circle with Conditional Glow */}
           <circle
             cx="32"
             cy="32"
@@ -133,9 +148,20 @@ function StatPill({ label, value }: { label: string; value: number }) {
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={dashOffset}
+            // Only apply filter if value is 100
+            filter={value > 99 ? "url(#glow)" : "none"}
+            className="transition-all duration-500 ease-in-out"
           />
         </svg>
-        <div className="absolute inset-0 flex items-center justify-center text-lg font-bold leading-none text-gray-900">
+
+        {/* Center Text with Conditional Glow/Color */}
+        <div 
+          className="absolute inset-0 flex items-center justify-center text-lg font-bold leading-none"
+          style={{ 
+            color: value > 99 ? ringColor : "#111827",
+            textShadow: value > 99 ? `0 0 8px ${ringColor}44` : "none" 
+          }}
+        >
           {Math.round(value)}
         </div>
       </div>
@@ -265,7 +291,7 @@ export default function SessionSummaryCard({
     idleRatio: summary.idleRatio,
   });
   const focusBadgeBackground = getTrafficLightColor(roundedProductivity);
-  const isFocusedYellow = roundedProductivity >= 70 && roundedProductivity <= 89;
+  const isFocusedYellow = roundedProductivity >= 70 && roundedProductivity <= 89 || roundedProductivity >= 100;
   const focusBadgeText = isFocusedYellow ? "#111827" : "#ffffff";
 
   const totalSeconds = secondsBetween(summary.startTimestamp, summary.endTimestamp);
@@ -341,8 +367,15 @@ export default function SessionSummaryCard({
         </div>
 
         <div
-          className="rounded-full px-3 py-1 text-xs font-bold shrink-0"
-          style={{ backgroundColor: focusBadgeBackground, color: focusBadgeText }}
+          className="rounded-full px-3 py-1 text-xs font-bold shrink-0 transition-all duration-500"
+          style={{ 
+            backgroundColor: focusBadgeBackground, 
+            color: focusBadgeText,
+            // Using filter: drop-shadow instead of box-shadow keeps the sizing more consistent
+            filter: roundedProductivity >= 100 
+              ? `drop-shadow(0 0 6px ${focusBadgeBackground})` 
+              : `drop-shadow(0 0 3px ${focusBadgeBackground}66)`
+          }}
         >
           {roundedProductivity}% productive
         </div>
